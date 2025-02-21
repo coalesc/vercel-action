@@ -31683,9 +31683,9 @@ module.exports = parseParams
 var __webpack_exports__ = {};
 
 // EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
-var lib_core = __nccwpck_require__(7484);
+var core = __nccwpck_require__(7484);
 // EXTERNAL MODULE: ./node_modules/@actions/exec/lib/exec.js
-var lib_exec = __nccwpck_require__(5236);
+var exec = __nccwpck_require__(5236);
 // EXTERNAL MODULE: ./node_modules/@actions/github/lib/github.js
 var github = __nccwpck_require__(3228);
 ;// CONCATENATED MODULE: ./package.json
@@ -31695,43 +31695,33 @@ const package_namespaceObject = /*#__PURE__*/JSON.parse('{"El":{"II":"^25.1.0"}}
 
 
 
-const { context } = github;
-const githubToken = lib_core.getInput("github-token");
-const workingDirectory = lib_core.getInput("working-directory");
 function isPullRequestType(event) {
     return event.startsWith("pull_request");
 }
-// Vercel
-function getVercelBin() {
-    const input = lib_core.getInput("vercel-version");
-    const fallback = package_namespaceObject.El.II;
-    return `vercel@${input || fallback}`;
-}
-const vercelToken = lib_core.getInput("vercel-token", { required: true });
-const vercelArgs = lib_core.getInput("vercel-args");
-const vercelOrgId = lib_core.getInput("vercel-org-id", { required: true });
-const vercelProjectId = lib_core.getInput("vercel-project-id", { required: true });
-const vercelScope = lib_core.getInput("scope");
-const vercelProjectName = lib_core.getInput("vercel-project-name");
-const vercelBin = getVercelBin();
-const octokit = githubToken ? github.getOctokit(githubToken) : undefined;
+const githubToken = core.getInput("github-token", { required: true });
+const vercel = {
+    token: core.getInput("vercel-token", { required: true }),
+    orgId: core.getInput("vercel-org-id", { required: true }),
+    projectId: core.getInput("vercel-project-id", { required: true }),
+    projectName: core.getInput("vercel-project-name"),
+    scope: core.getInput("scope"),
+    args: core.getInput("vercel-args"),
+    bin: `vercel@${core.getInput("vercel-version") || package_namespaceObject.El.II}`,
+};
+const octokit = github.getOctokit(githubToken);
 async function setEnv() {
-    core.info("set environment for vercel cli");
-    if (vercelOrgId) {
-        core.info("set env variable : VERCEL_ORG_ID");
-        core.exportVariable("VERCEL_ORG_ID", vercelOrgId);
+    core.info("Set environment data for Vercel CLI");
+    if (vercel.orgId) {
+        core.info("Set env variable: VERCEL_ORG_ID");
+        core.exportVariable("VERCEL_ORG_ID", vercel.orgId);
     }
-    if (vercelProjectId) {
-        core.info("set env variable : VERCEL_PROJECT_ID");
-        core.exportVariable("VERCEL_PROJECT_ID", vercelProjectId);
+    if (vercel.projectId) {
+        core.info("Set env variable: VERCEL_PROJECT_ID");
+        core.exportVariable("VERCEL_PROJECT_ID", vercel.projectId);
     }
 }
 function addVercelMetadata(key, value, providedArgs) {
-    // returns a list for the metadata commands if key was not supplied by user in action parameters
-    // returns an empty list if key was provided by user
-    const pattern = `^${key}=.+`;
-    const metadataRegex = new RegExp(pattern, "g");
-    // eslint-disable-next-line no-restricted-syntax
+    const metadataRegex = new RegExp(`^${key}=.+`, "g");
     for (const arg of providedArgs) {
         if (arg.match(metadataRegex)) {
             return [];
@@ -31739,15 +31729,6 @@ function addVercelMetadata(key, value, providedArgs) {
     }
     return ["-m", `${key}=${value}`];
 }
-/**
- *
- * The following regex is used to split the vercelArgs string into an array of arguments.
- * It conserves strings wrapped in simple / double quotes, with nested different quotes, as a single argument.
- *
- * Example:
- *
- * parseArgs(`--env foo=bar "foo=bar baz" 'foo="bar baz"'`) => ['--env', 'foo=bar', 'foo=bar baz', 'foo="bar baz"']
- */
 function parseArgs(s) {
     const args = [];
     for (const match of s.matchAll(/'([^']*)'|"([^"]*)"|[^\s]+/gm)) {
@@ -31756,59 +31737,52 @@ function parseArgs(s) {
     return args;
 }
 async function vercelDeploy(ref, commit) {
+    const providedArgs = parseArgs(vercel.args);
+    const args = [
+        ...providedArgs,
+        ...["-t", vercel.token],
+        ...addVercelMetadata("githubCommitSha", github.context.sha, providedArgs),
+        ...addVercelMetadata("githubCommitAuthorName", github.context.actor, providedArgs),
+        ...addVercelMetadata("githubCommitAuthorLogin", github.context.actor, providedArgs),
+        ...addVercelMetadata("githubDeployment", 1, providedArgs),
+        ...addVercelMetadata("githubOrg", github.context.repo.owner, providedArgs),
+        ...addVercelMetadata("githubRepo", github.context.repo.repo, providedArgs),
+        ...addVercelMetadata("githubCommitOrg", github.context.repo.owner, providedArgs),
+        ...addVercelMetadata("githubCommitRepo", github.context.repo.repo, providedArgs),
+        ...addVercelMetadata("githubCommitMessage", `"${commit}"`, providedArgs),
+        ...addVercelMetadata("githubCommitRef", ref.replace("refs/heads/", ""), providedArgs),
+    ];
+    if (vercel.scope) {
+        core.info("using scope");
+        args.push("--scope", vercel.scope);
+    }
     let output = "";
-    const options = {
+    await exec.exec("npx", [vercel.bin, ...args], {
         listeners: {
             stdout: (data) => {
                 output += data.toString();
                 core.info(data.toString());
             },
         },
-    };
-    if (workingDirectory) {
-        options.cwd = workingDirectory;
-    }
-    const providedArgs = parseArgs(vercelArgs);
-    const args = [
-        ...providedArgs,
-        ...["-t", vercelToken],
-        ...addVercelMetadata("githubCommitSha", context.sha, providedArgs),
-        ...addVercelMetadata("githubCommitAuthorName", context.actor, providedArgs),
-        ...addVercelMetadata("githubCommitAuthorLogin", context.actor, providedArgs),
-        ...addVercelMetadata("githubDeployment", 1, providedArgs),
-        ...addVercelMetadata("githubOrg", context.repo.owner, providedArgs),
-        ...addVercelMetadata("githubRepo", context.repo.repo, providedArgs),
-        ...addVercelMetadata("githubCommitOrg", context.repo.owner, providedArgs),
-        ...addVercelMetadata("githubCommitRepo", context.repo.repo, providedArgs),
-        ...addVercelMetadata("githubCommitMessage", `"${commit}"`, providedArgs),
-        ...addVercelMetadata("githubCommitRef", ref.replace("refs/heads/", ""), providedArgs),
-    ];
-    if (vercelScope) {
-        core.info("using scope");
-        args.push("--scope", vercelScope);
-    }
-    await exec.exec("npx", [vercelBin, ...args], options);
+    });
+    console.log(output);
     return output;
 }
 async function vercelInspect(deploymentUrl) {
+    const args = [vercel.bin, "inspect", deploymentUrl, "-t", vercel.token];
+    if (vercel.scope) {
+        core.info("using scope");
+        args.push("--scope", vercel.scope);
+    }
     let error = "";
-    const options = {
+    await exec.exec("npx", args, {
         listeners: {
             stderr: (data) => {
                 error += data.toString();
                 core.info(data.toString());
             },
         },
-    };
-    if (workingDirectory) {
-        options.cwd = workingDirectory;
-    }
-    const args = [vercelBin, "inspect", deploymentUrl, "-t", vercelToken];
-    if (vercelScope) {
-        core.info("using scope");
-        args.push("--scope", vercelScope);
-    }
-    await exec.exec("npx", args, options);
+    });
     const match = error.match(/^\s+name\s+(.+)$/m);
     return match?.length ? match[1] : null;
 }
@@ -31816,23 +31790,20 @@ async function findCommentsForEvent() {
     const defaultResponse = {
         data: [],
     };
-    core.debug("find comments for event");
-    if (context.eventName === "push") {
-        core.debug('event is "commit", use "listCommentsForCommit"');
+    if (github.context.eventName === "push") {
         const response = await octokit?.rest.repos
             .listCommentsForCommit({
-            ...context.repo,
-            commit_sha: context.sha,
+            ...github.context.repo,
+            commit_sha: github.context.sha,
         })
             .catch(() => defaultResponse);
         return response ?? defaultResponse;
     }
-    if (isPullRequestType(context.eventName)) {
-        core.debug(`event is "${context.eventName}", use "listComments"`);
+    if (isPullRequestType(github.context.eventName)) {
         const response = await octokit?.rest.issues
             .listComments({
-            ...context.repo,
-            issue_number: context.issue.number,
+            ...github.context.repo,
+            issue_number: github.context.issue.number,
         })
             .catch(() => defaultResponse);
         return response ?? defaultResponse;
@@ -31841,9 +31812,6 @@ async function findCommentsForEvent() {
     return defaultResponse;
 }
 async function findPreviousComment(text) {
-    if (!octokit) {
-        return null;
-    }
     core.info("find comment");
     const { data: comments } = await findCommentsForEvent();
     const vercelPreviewURLComment = comments.find((comment) => comment.body?.startsWith(text));
@@ -31857,166 +31825,135 @@ async function findPreviousComment(text) {
 function buildCommentPrefix(name) {
     return `Deployment for _${name}_ is ready!`;
 }
-function buildCommentBody(commit, name, previewUrl, inspectorUrl) {
+function buildCommentBody(context) {
     return [
-        buildCommentPrefix(name),
+        buildCommentPrefix(context.name),
         "",
         "This pull request has been deployed to Vercel.",
         "",
         "<table>",
         "<tr>",
         "<td><strong>Latest commit:</strong></td>",
-        `<td><code>${commit}</code></td>`,
+        `<td><code>${context.commitSha}</code></td>`,
         "</tr>",
         "<tr>",
         "<td><strong>✅ Preview:</strong></td>",
-        `<td><a href='${previewUrl}'>${previewUrl}</a></td>`,
+        `<td><a href='${context.previewUrl}'>${context.previewUrl}</a></td>`,
         "</tr>",
         "<tr>",
         "<td><strong>🔍 Inspect:</strong></td>",
-        `<td><a href='${inspectorUrl}'>${inspectorUrl}</a></td>`,
+        `<td><a href='${context.inspectorUrl}'>${context.inspectorUrl}</a></td>`,
         "</tr>",
         "</table>",
         "",
-        `[View Workflow Logs](${`https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`})`,
+        `[View Workflow Logs](${`https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}`})`,
     ].join("\n");
 }
-// async function createCommentOnCommit(
-//   deploymentCommit: string,
-//   deploymentUrl: string,
-//   deploymentName: string,
-// ) {
-//   if (!octokit) {
-//     return;
-//   }
-//   const commentId = await findPreviousComment(
-//     buildCommentPrefix(deploymentName),
-//   );
-//   const commentBody = buildCommentBody(
-//     deploymentCommit,
-//     deploymentUrl,
-//     deploymentName,
-//   );
-//   if (commentId) {
-//     await octokit.rest.repos.updateCommitComment({
-//       ...context.repo,
-//       comment_id: commentId,
-//       body: commentBody,
-//     });
-//   } else {
-//     await octokit.rest.repos.createCommitComment({
-//       ...context.repo,
-//       commit_sha: context.sha,
-//       body: commentBody,
-//     });
-//   }
-// }
-// async function createCommentOnPullRequest(
-//   deploymentCommit: string,
-//   deploymentUrl: string,
-//   deploymentName: string,
-// ) {
-//   if (!octokit) {
-//     return;
-//   }
-//   const commentId = await findPreviousComment(
-//     `Deploy preview for _${deploymentName}_ ready!`,
-//   );
-//   const commentBody = buildCommentBody(
-//     deploymentCommit,
-//     deploymentUrl,
-//     deploymentName,
-//   );
-//   if (commentId) {
-//     await octokit.rest.issues.updateComment({
-//       ...context.repo,
-//       comment_id: commentId,
-//       body: commentBody,
-//     });
-//   } else {
-//     await octokit.rest.issues.createComment({
-//       ...context.repo,
-//       issue_number: context.issue.number,
-//       body: commentBody,
-//     });
-//   }
-// }
-async function run() {
-    lib_core.debug(`action : ${context.action}`);
-    lib_core.debug(`ref : ${context.ref}`);
-    lib_core.debug(`eventName : ${context.eventName}`);
-    lib_core.debug(`actor : ${context.actor}`);
-    lib_core.debug(`sha : ${context.sha}`);
-    lib_core.debug(`workflow : ${context.workflow}`);
-    if (isPullRequestType(context.eventName)) {
-        const payload = context.payload;
-        console.log(payload);
+async function createCommentOnCommit(context) {
+    const commentBody = buildCommentBody(context);
+    const commentId = await findPreviousComment(buildCommentPrefix(context.name));
+    if (commentId) {
+        await octokit.rest.repos.updateCommitComment({
+            ...github.context.repo,
+            comment_id: commentId,
+            body: commentBody,
+        });
     }
-    // let { ref, sha } = context;
-    // await setEnv();
-    // let commit = "";
-    // exec.exec("git", ["log", "-1", "--pretty=format:%B"], {
-    //   listeners: {
-    //     stdout: (data) => {
-    //       commit += data.toString();
-    //     },
-    //   },
-    // });
-    // commit = commit.trim();
-    // if (github.context.eventName === "push") {
-    //   const pushPayload = github.context.payload;
-    //   core.debug(`The head commit is: ${pushPayload.head_commit}`);
-    // } else if (isPullRequestType(github.context.eventName)) {
-    //   const pullRequestPayload = github.context.payload;
-    //   const pr =
-    //     pullRequestPayload.pull_request || pullRequestPayload.pull_request_target;
-    //   core.debug(`head : ${pr.head}`);
-    //   ref = pr.head.ref;
-    //   sha = pr.head.sha;
-    //   core.debug(`The head ref is: ${pr.head.ref}`);
-    //   core.debug(`The head sha is: ${pr.head.sha}`);
-    //   if (octokit) {
-    //     const { data: commitData } = await octokit.rest.git.getCommit({
-    //       ...context.repo,
-    //       commit_sha: sha,
-    //     });
-    //     commit = commitData.message;
-    //     core.debug(`The head commit is: ${commit}`);
-    //   }
-    // }
-    // const deploymentUrl = await vercelDeploy(ref, commit);
-    // if (deploymentUrl) {
-    //   core.info("set preview-url output");
-    //   core.setOutput("preview-url", deploymentUrl);
-    // } else {
-    //   core.warning("get preview-url error");
-    // }
-    // const deploymentName =
-    //   vercelProjectName || (await vercelInspect(deploymentUrl));
-    // if (deploymentName) {
-    //   core.info("set preview-name output");
-    //   core.setOutput("preview-name", deploymentName);
-    // } else {
-    //   core.warning("get preview-name error");
-    // }
-    // if (githubToken && deploymentName) {
-    //   if (context.issue.number) {
-    //     core.info("this is related issue or pull_request");
-    //     await createCommentOnPullRequest(sha, deploymentUrl, deploymentName);
-    //   } else if (context.eventName === "push") {
-    //     core.info("this is push event");
-    //     await createCommentOnCommit(sha, deploymentUrl, deploymentName);
-    //   }
-    // } else {
-    //   core.info("comment : disabled");
-    // }
+    else {
+        await octokit.rest.repos.createCommitComment({
+            ...github.context.repo,
+            commit_sha: github.context.sha,
+            body: commentBody,
+        });
+    }
+}
+async function createCommentOnPullRequest(context) {
+    const commentBody = buildCommentBody(context);
+    const commentId = await findPreviousComment(buildCommentPrefix(context.name));
+    if (commentId) {
+        await octokit.rest.issues.updateComment({
+            ...github.context.repo,
+            comment_id: commentId,
+            body: commentBody,
+        });
+    }
+    else {
+        await octokit.rest.issues.createComment({
+            ...github.context.repo,
+            issue_number: github.context.issue.number,
+            body: commentBody,
+        });
+    }
+}
+async function run() {
+    if (isPullRequestType(github.context.eventName)) {
+        const payload = github.context.payload;
+        const baseRepo = payload.pull_request.base.repo;
+        if (github.context.repo.owner !== baseRepo.owner.login) {
+            core.info("Repository is forked, skipping deployment");
+            return;
+        }
+    }
+    let { ref, sha } = github.context;
+    await setEnv();
+    let commitMessage = "";
+    if (github.context.eventName === "push") {
+        const pushPayload = github.context.payload;
+        commitMessage = pushPayload.head_commit?.message ?? "";
+    }
+    else if (isPullRequestType(github.context.eventName)) {
+        const prPayload = github.context.payload;
+        ref = prPayload.pull_request.head.ref;
+        sha = prPayload.pull_request.head.sha;
+        const { data } = await octokit.rest.git.getCommit({
+            ...github.context.repo,
+            commit_sha: sha,
+        });
+        commitMessage = data.message;
+    }
+    const deploymentUrl = await vercelDeploy(ref, commitMessage);
+    if (deploymentUrl) {
+        core.info("set preview-url output");
+        core.setOutput("preview-url", deploymentUrl);
+    }
+    else {
+        core.warning("get preview-url error");
+    }
+    const deploymentName = vercel.projectName || (await vercelInspect(deploymentUrl));
+    if (deploymentName) {
+        core.info("set preview-name output");
+        core.setOutput("preview-name", deploymentName);
+    }
+    else {
+        core.warning("get preview-name error");
+    }
+    if (deploymentName) {
+        if (github.context.issue.number) {
+            core.info("this is related issue or pull_request");
+            await createCommentOnPullRequest({
+                commitSha: sha,
+                name: deploymentName,
+                previewUrl: deploymentUrl,
+                inspectorUrl: `${deploymentUrl}/inspect`,
+            });
+        }
+        else if (github.context.eventName === "push") {
+            core.info("this is push event");
+            await createCommentOnCommit({
+                commitSha: sha,
+                name: deploymentName,
+                previewUrl: deploymentUrl,
+                inspectorUrl: `${deploymentUrl}/inspect`,
+            });
+        }
+    }
 }
 (async () => {
     try {
         await run();
     }
     catch (error) {
-        lib_core.setFailed(error.message);
+        core.setFailed(error.message);
     }
 })();
 

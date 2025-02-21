@@ -16,7 +16,7 @@ const vercel = {
   projectName: core.getInput("vercel-project-name"),
   scope: core.getInput("scope"),
   args: core.getInput("vercel-args"),
-  bin: `vercel@${core.getInput("vercel-version") ?? packageJSON.dependencies.vercel}`,
+  bin: `vercel@${core.getInput("vercel-version") || packageJSON.dependencies.vercel}`,
 };
 
 const octokit = github.getOctokit(githubToken);
@@ -170,9 +170,6 @@ async function findCommentsForEvent(): Promise<{ data: Comment[] }> {
 }
 
 async function findPreviousComment(text: string) {
-  if (!octokit) {
-    return null;
-  }
   core.info("find comment");
   const { data: comments } = await findCommentsForEvent();
 
@@ -191,29 +188,31 @@ function buildCommentPrefix(name: string) {
   return `Deployment for _${name}_ is ready!`;
 }
 
-function buildCommentBody(
-  commit: string,
-  name: string,
-  previewUrl: string,
-  inspectorUrl: string,
-) {
+interface CommentContext {
+  name: string;
+  commitSha: string;
+  previewUrl: string;
+  inspectorUrl: string;
+}
+
+function buildCommentBody(context: CommentContext) {
   return [
-    buildCommentPrefix(name),
+    buildCommentPrefix(context.name),
     "",
     "This pull request has been deployed to Vercel.",
     "",
     "<table>",
     "<tr>",
     "<td><strong>Latest commit:</strong></td>",
-    `<td><code>${commit}</code></td>`,
+    `<td><code>${context.commitSha}</code></td>`,
     "</tr>",
     "<tr>",
     "<td><strong>✅ Preview:</strong></td>",
-    `<td><a href='${previewUrl}'>${previewUrl}</a></td>`,
+    `<td><a href='${context.previewUrl}'>${context.previewUrl}</a></td>`,
     "</tr>",
     "<tr>",
     "<td><strong>🔍 Inspect:</strong></td>",
-    `<td><a href='${inspectorUrl}'>${inspectorUrl}</a></td>`,
+    `<td><a href='${context.inspectorUrl}'>${context.inspectorUrl}</a></td>`,
     "</tr>",
     "</table>",
     "",
@@ -221,71 +220,43 @@ function buildCommentBody(
   ].join("\n");
 }
 
-// async function createCommentOnCommit(
-//   deploymentCommit: string,
-//   deploymentUrl: string,
-//   deploymentName: string,
-// ) {
-//   if (!octokit) {
-//     return;
-//   }
-//   const commentId = await findPreviousComment(
-//     buildCommentPrefix(deploymentName),
-//   );
+async function createCommentOnCommit(context: CommentContext) {
+  const commentBody = buildCommentBody(context);
+  const commentId = await findPreviousComment(buildCommentPrefix(context.name));
 
-//   const commentBody = buildCommentBody(
-//     deploymentCommit,
-//     deploymentUrl,
-//     deploymentName,
-//   );
+  if (commentId) {
+    await octokit.rest.repos.updateCommitComment({
+      ...github.context.repo,
+      comment_id: commentId,
+      body: commentBody,
+    });
+  } else {
+    await octokit.rest.repos.createCommitComment({
+      ...github.context.repo,
+      commit_sha: github.context.sha,
+      body: commentBody,
+    });
+  }
+}
 
-//   if (commentId) {
-//     await octokit.rest.repos.updateCommitComment({
-//       ...context.repo,
-//       comment_id: commentId,
-//       body: commentBody,
-//     });
-//   } else {
-//     await octokit.rest.repos.createCommitComment({
-//       ...context.repo,
-//       commit_sha: context.sha,
-//       body: commentBody,
-//     });
-//   }
-// }
+async function createCommentOnPullRequest(context: CommentContext) {
+  const commentBody = buildCommentBody(context);
+  const commentId = await findPreviousComment(buildCommentPrefix(context.name));
 
-// async function createCommentOnPullRequest(
-//   deploymentCommit: string,
-//   deploymentUrl: string,
-//   deploymentName: string,
-// ) {
-//   if (!octokit) {
-//     return;
-//   }
-//   const commentId = await findPreviousComment(
-//     `Deploy preview for _${deploymentName}_ ready!`,
-//   );
-
-//   const commentBody = buildCommentBody(
-//     deploymentCommit,
-//     deploymentUrl,
-//     deploymentName,
-//   );
-
-//   if (commentId) {
-//     await octokit.rest.issues.updateComment({
-//       ...context.repo,
-//       comment_id: commentId,
-//       body: commentBody,
-//     });
-//   } else {
-//     await octokit.rest.issues.createComment({
-//       ...context.repo,
-//       issue_number: context.issue.number,
-//       body: commentBody,
-//     });
-//   }
-// }
+  if (commentId) {
+    await octokit.rest.issues.updateComment({
+      ...github.context.repo,
+      comment_id: commentId,
+      body: commentBody,
+    });
+  } else {
+    await octokit.rest.issues.createComment({
+      ...github.context.repo,
+      issue_number: github.context.issue.number,
+      body: commentBody,
+    });
+  }
+}
 
 async function run() {
   if (isPullRequestType(github.context.eventName)) {
@@ -293,7 +264,7 @@ async function run() {
 
     const baseRepo = payload.pull_request.base.repo;
     if (github.context.repo.owner !== baseRepo.owner.login) {
-      core.info("forked repository");
+      core.info("Repository is forked, skipping deployment");
       return;
     }
   }
@@ -304,7 +275,6 @@ async function run() {
   let commitMessage = "";
   if (github.context.eventName === "push") {
     const pushPayload = github.context.payload as PushEvent;
-
     commitMessage = pushPayload.head_commit?.message ?? "";
   } else if (isPullRequestType(github.context.eventName)) {
     const prPayload = github.context.payload as PullRequestEvent;
@@ -327,26 +297,34 @@ async function run() {
     core.warning("get preview-url error");
   }
 
-  // const deploymentName =
-  //   vercelProjectName || (await vercelInspect(deploymentUrl));
-  // if (deploymentName) {
-  //   core.info("set preview-name output");
-  //   core.setOutput("preview-name", deploymentName);
-  // } else {
-  //   core.warning("get preview-name error");
-  // }
+  const deploymentName =
+    vercel.projectName || (await vercelInspect(deploymentUrl));
+  if (deploymentName) {
+    core.info("set preview-name output");
+    core.setOutput("preview-name", deploymentName);
+  } else {
+    core.warning("get preview-name error");
+  }
 
-  // if (githubToken && deploymentName) {
-  //   if (context.issue.number) {
-  //     core.info("this is related issue or pull_request");
-  //     await createCommentOnPullRequest(sha, deploymentUrl, deploymentName);
-  //   } else if (context.eventName === "push") {
-  //     core.info("this is push event");
-  //     await createCommentOnCommit(sha, deploymentUrl, deploymentName);
-  //   }
-  // } else {
-  //   core.info("comment : disabled");
-  // }
+  if (deploymentName) {
+    if (github.context.issue.number) {
+      core.info("this is related issue or pull_request");
+      await createCommentOnPullRequest({
+        commitSha: sha,
+        name: deploymentName,
+        previewUrl: deploymentUrl,
+        inspectorUrl: `${deploymentUrl}/inspect`,
+      });
+    } else if (github.context.eventName === "push") {
+      core.info("this is push event");
+      await createCommentOnCommit({
+        commitSha: sha,
+        name: deploymentName,
+        previewUrl: deploymentUrl,
+        inspectorUrl: `${deploymentUrl}/inspect`,
+      });
+    }
+  }
 }
 
 (async () => {
