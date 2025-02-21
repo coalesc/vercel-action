@@ -1,9 +1,8 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as github from "@actions/github";
-import { stripIndents } from "common-tags";
-import packageJSON from "./package.json" assert { type: "json" };
-
+import type { PullRequestEvent } from "@octokit/webhooks-types";
+import packageJSON from "../package.json" assert { type: "json" };
 const { context } = github;
 
 const githubToken = core.getInput("github-token");
@@ -208,98 +207,105 @@ async function findPreviousComment(text: string) {
   return null;
 }
 
-function buildCommentPrefix(deploymentName: string) {
-  return `Deploy preview for _${deploymentName}_ ready!`;
+function buildCommentPrefix(name: string) {
+  return `Deployment for _${name}_ is ready!`;
 }
 
 function buildCommentBody(
-  deploymentCommit: string,
-  deploymentUrl: string,
-  deploymentName: string,
+  commit: string,
+  name: string,
+  previewUrl: string,
+  inspectorUrl: string,
 ) {
-  const prefix = `${buildCommentPrefix(deploymentName)}\n\n`;
-
-  const rawGithubComment =
-    prefix +
-    stripIndents`
-      ✅ Preview
-      {{deploymentUrl}}
-      
-      Built with commit {{deploymentCommit}}.
-      This pull request is being automatically deployed with [vercel-action](https://github.com/marketplace/actions/vercel-action)
-    `;
-
-  return rawGithubComment
-    .replace(/\{\{deploymentCommit\}\}/g, deploymentCommit)
-    .replace(/\{\{deploymentName\}\}/g, deploymentName)
-    .replace(/\{\{deploymentUrl\}\}/g, deploymentUrl);
+  return [
+    buildCommentPrefix(name),
+    "",
+    "This pull request has been deployed to Vercel.",
+    "",
+    "<table>",
+    "<tr>",
+    "<td><strong>Latest commit:</strong></td>",
+    `<td><code>${commit}</code></td>`,
+    "</tr>",
+    "<tr>",
+    "<td><strong>✅ Preview:</strong></td>",
+    `<td><a href='${previewUrl}'>${previewUrl}</a></td>`,
+    "</tr>",
+    "<tr>",
+    "<td><strong>🔍 Inspect:</strong></td>",
+    `<td><a href='${inspectorUrl}'>${inspectorUrl}</a></td>`,
+    "</tr>",
+    "</table>",
+    "",
+    `[View Workflow Logs](${`https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`})`,
+  ].join("\n");
 }
 
-async function createCommentOnCommit(
-  deploymentCommit: string,
-  deploymentUrl: string,
-  deploymentName: string,
-) {
-  if (!octokit) {
-    return;
-  }
-  const commentId = await findPreviousComment(
-    buildCommentPrefix(deploymentName),
-  );
+// async function createCommentOnCommit(
+//   deploymentCommit: string,
+//   deploymentUrl: string,
+//   deploymentName: string,
+// ) {
+//   if (!octokit) {
+//     return;
+//   }
+//   const commentId = await findPreviousComment(
+//     buildCommentPrefix(deploymentName),
+//   );
 
-  const commentBody = buildCommentBody(
-    deploymentCommit,
-    deploymentUrl,
-    deploymentName,
-  );
+//   const commentBody = buildCommentBody(
+//     deploymentCommit,
+//     deploymentUrl,
+//     deploymentName,
+//   );
 
-  if (commentId) {
-    await octokit.rest.repos.updateCommitComment({
-      ...context.repo,
-      comment_id: commentId,
-      body: commentBody,
-    });
-  } else {
-    await octokit.rest.repos.createCommitComment({
-      ...context.repo,
-      commit_sha: context.sha,
-      body: commentBody,
-    });
-  }
-}
+//   if (commentId) {
+//     await octokit.rest.repos.updateCommitComment({
+//       ...context.repo,
+//       comment_id: commentId,
+//       body: commentBody,
+//     });
+//   } else {
+//     await octokit.rest.repos.createCommitComment({
+//       ...context.repo,
+//       commit_sha: context.sha,
+//       body: commentBody,
+//     });
+//   }
+// }
 
-async function createCommentOnPullRequest(
-  deploymentCommit: string,
-  deploymentUrl: string,
-  deploymentName: string,
-) {
-  if (!octokit) {
-    return;
-  }
-  const commentId = await findPreviousComment(
-    `Deploy preview for _${deploymentName}_ ready!`,
-  );
+// async function createCommentOnPullRequest(
+//   deploymentCommit: string,
+//   deploymentUrl: string,
+//   deploymentName: string,
+// ) {
+//   if (!octokit) {
+//     return;
+//   }
+//   const commentId = await findPreviousComment(
+//     `Deploy preview for _${deploymentName}_ ready!`,
+//   );
 
-  const commentBody = buildCommentBody(
-    deploymentCommit,
-    deploymentUrl,
-    deploymentName,
-  );
+//   const commentBody = buildCommentBody(
+//     deploymentCommit,
+//     deploymentUrl,
+//     deploymentName,
+//   );
 
-  if (commentId) {
-    await octokit.rest.issues.updateComment({
-      ...context.repo,
-      comment_id: commentId,
-      body: commentBody,
-    });
-  } else {
-    await octokit.rest.issues.createComment({
-      ...context.repo,
-      issue_number: context.issue.number,
-      body: commentBody,
-    });
-  }
-}
+//   if (commentId) {
+//     await octokit.rest.issues.updateComment({
+//       ...context.repo,
+//       comment_id: commentId,
+//       body: commentBody,
+//     });
+//   } else {
+//     await octokit.rest.issues.createComment({
+//       ...context.repo,
+//       issue_number: context.issue.number,
+//       body: commentBody,
+//     });
+//   }
+// }
 
 async function run() {
   core.debug(`action : ${context.action}`);
@@ -308,72 +314,78 @@ async function run() {
   core.debug(`actor : ${context.actor}`);
   core.debug(`sha : ${context.sha}`);
   core.debug(`workflow : ${context.workflow}`);
-  let { ref, sha } = context;
-  await setEnv();
 
-  let commit = "";
-  exec.exec("git", ["log", "-1", "--pretty=format:%B"], {
-    listeners: {
-      stdout: (data) => {
-        commit += data.toString();
-      },
-    },
-  });
-  commit = commit.trim();
-
-  if (github.context.eventName === "push") {
-    const pushPayload = github.context.payload;
-    core.debug(`The head commit is: ${pushPayload.head_commit}`);
-  } else if (isPullRequestType(github.context.eventName)) {
-    const pullRequestPayload = github.context.payload;
-    const pr =
-      pullRequestPayload.pull_request || pullRequestPayload.pull_request_target;
-    core.debug(`head : ${pr.head}`);
-
-    ref = pr.head.ref;
-    sha = pr.head.sha;
-    core.debug(`The head ref is: ${pr.head.ref}`);
-    core.debug(`The head sha is: ${pr.head.sha}`);
-
-    if (octokit) {
-      const { data: commitData } = await octokit.rest.git.getCommit({
-        ...context.repo,
-        commit_sha: sha,
-      });
-      commit = commitData.message;
-      core.debug(`The head commit is: ${commit}`);
-    }
+  if (isPullRequestType(context.eventName)) {
+    const payload = context.payload as PullRequestEvent;
+    console.log(payload);
   }
 
-  const deploymentUrl = await vercelDeploy(ref, commit);
+  // let { ref, sha } = context;
+  // await setEnv();
 
-  if (deploymentUrl) {
-    core.info("set preview-url output");
-    core.setOutput("preview-url", deploymentUrl);
-  } else {
-    core.warning("get preview-url error");
-  }
+  // let commit = "";
+  // exec.exec("git", ["log", "-1", "--pretty=format:%B"], {
+  //   listeners: {
+  //     stdout: (data) => {
+  //       commit += data.toString();
+  //     },
+  //   },
+  // });
+  // commit = commit.trim();
 
-  const deploymentName =
-    vercelProjectName || (await vercelInspect(deploymentUrl));
-  if (deploymentName) {
-    core.info("set preview-name output");
-    core.setOutput("preview-name", deploymentName);
-  } else {
-    core.warning("get preview-name error");
-  }
+  // if (github.context.eventName === "push") {
+  //   const pushPayload = github.context.payload;
+  //   core.debug(`The head commit is: ${pushPayload.head_commit}`);
+  // } else if (isPullRequestType(github.context.eventName)) {
+  //   const pullRequestPayload = github.context.payload;
+  //   const pr =
+  //     pullRequestPayload.pull_request || pullRequestPayload.pull_request_target;
+  //   core.debug(`head : ${pr.head}`);
 
-  if (githubToken && deploymentName) {
-    if (context.issue.number) {
-      core.info("this is related issue or pull_request");
-      await createCommentOnPullRequest(sha, deploymentUrl, deploymentName);
-    } else if (context.eventName === "push") {
-      core.info("this is push event");
-      await createCommentOnCommit(sha, deploymentUrl, deploymentName);
-    }
-  } else {
-    core.info("comment : disabled");
-  }
+  //   ref = pr.head.ref;
+  //   sha = pr.head.sha;
+  //   core.debug(`The head ref is: ${pr.head.ref}`);
+  //   core.debug(`The head sha is: ${pr.head.sha}`);
+
+  //   if (octokit) {
+  //     const { data: commitData } = await octokit.rest.git.getCommit({
+  //       ...context.repo,
+  //       commit_sha: sha,
+  //     });
+  //     commit = commitData.message;
+  //     core.debug(`The head commit is: ${commit}`);
+  //   }
+  // }
+
+  // const deploymentUrl = await vercelDeploy(ref, commit);
+
+  // if (deploymentUrl) {
+  //   core.info("set preview-url output");
+  //   core.setOutput("preview-url", deploymentUrl);
+  // } else {
+  //   core.warning("get preview-url error");
+  // }
+
+  // const deploymentName =
+  //   vercelProjectName || (await vercelInspect(deploymentUrl));
+  // if (deploymentName) {
+  //   core.info("set preview-name output");
+  //   core.setOutput("preview-name", deploymentName);
+  // } else {
+  //   core.warning("get preview-name error");
+  // }
+
+  // if (githubToken && deploymentName) {
+  //   if (context.issue.number) {
+  //     core.info("this is related issue or pull_request");
+  //     await createCommentOnPullRequest(sha, deploymentUrl, deploymentName);
+  //   } else if (context.eventName === "push") {
+  //     core.info("this is push event");
+  //     await createCommentOnCommit(sha, deploymentUrl, deploymentName);
+  //   }
+  // } else {
+  //   core.info("comment : disabled");
+  // }
 }
 
 (async () => {

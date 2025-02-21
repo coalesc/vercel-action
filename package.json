@@ -1,53 +1,38 @@
 {
-	"name": "vercel-action",
-	"private": true,
-	"license": "MIT",
-	"type": "module",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/amondnet/vercel-action"
-	},
-	"author": {
-		"name": "Minsu Lee",
-		"email": "amond@amond.net",
-		"url": "https://amond.dev"
-	},
-	"version": "26.0.0",
-	"main": "index.js",
-	"scripts": {
-		"build": "ncc build index.ts -o dist --license LICENSE",
-		"check": "biome check ."
-	},
-	"dependencies": {
-		"@actions/core": "^1.11.1",
-		"@actions/exec": "^1.1.1",
-		"@actions/github": "^6.0.0",
-		"@octokit/webhooks": "latest",
-		"axios": "^1.7.9",
-		"common-tags": "^1.8.2",
-		"vercel": "25.1.0"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
-		"@types/common-tags": "^1.8.4",
-		"@vercel/ncc": "^0.38.3",
-		"typescript": "^5.7.3"
-	},
-	"engines": {
-		"node": "v20"
-	},
-	"keywords": [
-		"GitHub",
-		"Actions",
-		"Vercel"
-	],
-	"packageManager": "pnpm@10.4.1",
-	"pnpm": {
-		"ignoredBuiltDependencies": [
-			"vercel"
-		],
-		"onlyBuiltDependencies": [
-			"vercel"
-		]
-	}
+  "name": "vercel-action",
+  "private": true,
+  "version": "26.0.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coalesc/vercel-action"
+  },
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist --license LICENSE",
+    "check": "biome check ."
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/exec": "^1.1.1",
+    "@actions/github": "^6.0.0",
+    "common-tags": "^1.8.2",
+    "vercel": "^25.1.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@octokit/webhooks-types": "^7.6.1",
+    "@types/common-tags": "^1.8.4",
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": "v20"
+  },
+  "keywords": [
+    "GitHub",
+    "Actions",
+    "Vercel"
+  ],
+  "packageManager": "npm@11.1.0+sha512.acf301ad9b9ddba948fcb72341e2f0fcae477f56a95cc2a092934d133a7461062633cefbf93d5934a3dc0768674e2edee9f04dcfcc4bb4c327ff0e3a7d552a1b"
 }
