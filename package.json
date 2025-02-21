@@ -2,6 +2,7 @@
 	"name": "vercel-action",
 	"private": true,
 	"license": "MIT",
+	"type": "module",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/amondnet/vercel-action"
@@ -14,8 +15,7 @@
 	"version": "26.0.0",
 	"main": "index.js",
 	"scripts": {
-		"start": "node ./index.js",
-		"build": "ncc build index.js -o dist --license LICENSE",
+		"build": "ncc build index.ts -o dist --license LICENSE",
 		"check": "biome check ."
 	},
 	"dependencies": {
@@ -29,15 +29,25 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
-		"@vercel/ncc": "^0.38.3"
+		"@types/common-tags": "^1.8.4",
+		"@vercel/ncc": "^0.38.3",
+		"typescript": "^5.7.3"
 	},
 	"engines": {
 		"node": "v20"
 	},
-	"keywords": ["GitHub", "Actions", "Vercel"],
+	"keywords": [
+		"GitHub",
+		"Actions",
+		"Vercel"
+	],
 	"packageManager": "pnpm@10.4.1",
 	"pnpm": {
-		"ignoredBuiltDependencies": ["vercel"],
-		"onlyBuiltDependencies": ["vercel"]
+		"ignoredBuiltDependencies": [
+			"vercel"
+		],
+		"onlyBuiltDependencies": [
+			"vercel"
+		]
 	}
 }
