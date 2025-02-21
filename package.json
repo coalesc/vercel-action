@@ -17,7 +17,7 @@
     "@actions/exec": "^1.1.1",
     "@actions/github": "^6.0.0",
     "common-tags": "^1.8.2",
-    "vercel": "^25.1.0"
+    "vercel": "^41.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
@@ -34,5 +34,5 @@
     "Actions",
     "Vercel"
   ],
-  "packageManager": "npm@11.1.0+sha512.acf301ad9b9ddba948fcb72341e2f0fcae477f56a95cc2a092934d133a7461062633cefbf93d5934a3dc0768674e2edee9f04dcfcc4bb4c327ff0e3a7d552a1b"
+  "packageManager": "npm@11.1.0"
 }

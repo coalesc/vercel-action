@@ -290,6 +290,7 @@ async function run() {
   }
 
   const deploymentUrl = await vercelDeploy(ref, commitMessage);
+  console.log(deploymentUrl);
   if (deploymentUrl) {
     core.info("set preview-url output");
     core.setOutput("preview-url", deploymentUrl);
