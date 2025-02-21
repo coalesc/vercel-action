@@ -289,14 +289,15 @@ async function run() {
     commitMessage = data.message;
   }
 
+  core.startGroup("Deploying to Vercel");
   const deploymentUrl = await vercelDeploy(ref, commitMessage);
-  console.log(deploymentUrl);
   if (deploymentUrl) {
-    core.info("set preview-url output");
+    core.info(`Setting preview URL to ${deploymentUrl}`);
     core.setOutput("preview-url", deploymentUrl);
   } else {
-    core.warning("get preview-url error");
+    core.warning("Couldn't get preview URL");
   }
+  core.endGroup();
 
   const deploymentName =
     vercel.projectName || (await vercelInspect(deploymentUrl));
