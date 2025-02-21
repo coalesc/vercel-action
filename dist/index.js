@@ -31689,7 +31689,7 @@ var exec = __nccwpck_require__(5236);
 // EXTERNAL MODULE: ./node_modules/@actions/github/lib/github.js
 var github = __nccwpck_require__(3228);
 ;// CONCATENATED MODULE: ./package.json
-const package_namespaceObject = /*#__PURE__*/JSON.parse('{"El":{"II":"^25.1.0"}}');
+const package_namespaceObject = /*#__PURE__*/JSON.parse('{"El":{"II":"^41.2.0"}}');
 ;// CONCATENATED MODULE: ./src/index.ts
 
 
@@ -31912,6 +31912,7 @@ async function run() {
         commitMessage = data.message;
     }
     const deploymentUrl = await vercelDeploy(ref, commitMessage);
+    console.log(deploymentUrl);
     if (deploymentUrl) {
         core.info("set preview-url output");
         core.setOutput("preview-url", deploymentUrl);
