@@ -7,8 +7,9 @@ interface Comment {
 }
 
 interface CommentContext {
+  body?: string;
   name?: string;
-  commitSha: string;
+  commitSha?: string;
   inspectUrl?: string;
   deploymentUrl?: string;
 }
@@ -30,7 +31,7 @@ export class Rest {
   }
 
   private async createCommentOnCommit(context: CommentContext) {
-    const commentBody = this.buildCommentBody(context);
+    const commentBody = context.body ?? this.buildCommentBody(context);
     const commentId = await this.findPreviousComment(this.buildCommentPrefix());
 
     if (commentId) {
@@ -49,7 +50,7 @@ export class Rest {
   }
 
   private async createCommentOnPullRequest(context: CommentContext) {
-    const commentBody = this.buildCommentBody(context);
+    const commentBody = context.body ?? this.buildCommentBody(context);
     const commentId = await this.findPreviousComment(this.buildCommentPrefix());
 
     if (commentId) {
