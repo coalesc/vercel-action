@@ -56,6 +56,7 @@ export class Rest {
       ...deploymentOptions,
       ref,
       required_contexts: [],
+      auto_merge: false,
     });
   }
 

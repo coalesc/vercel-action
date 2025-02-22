@@ -31723,6 +31723,7 @@ class Rest {
             ...deploymentOptions,
             ref,
             required_contexts: [],
+            auto_merge: false,
         });
     }
     async updateDeployment(id, state, urls) {
