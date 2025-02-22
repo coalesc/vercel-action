@@ -67,6 +67,10 @@ async function run() {
     commitMessage = data.message;
   }
 
+  core.startGroup("Setting pending comment");
+  await rest.createComment({ commitSha: sha });
+  core.endGroup();
+
   core.startGroup("Setting deployment status");
   const { status, data } = await rest.createDeployment(sha);
   if (status !== 201) {
@@ -75,10 +79,6 @@ async function run() {
     deploymentId = data.id;
     await rest.updateDeployment(deploymentId, "pending");
   }
-  core.endGroup();
-
-  core.startGroup("Setting pending comment");
-  await rest.createComment({ commitSha: sha });
   core.endGroup();
 
   await vercel.setEnv();
