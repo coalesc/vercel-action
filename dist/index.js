@@ -31900,7 +31900,7 @@ class Vercel {
 const vercel = new Vercel();
 const rest = new Rest();
 async function run() {
-    const { ref, sha } = github.context;
+    let { ref, sha } = github.context;
     const forkBody = [
         "⚠️ This PR is from a repository outside your account so it will not be deployed.",
         "",
@@ -31932,21 +31932,22 @@ async function run() {
             return;
         }
     }
-    console.log("Hello, world!");
-    // let commitMessage = "";
-    // if (github.context.eventName === "push") {
-    //   const pushPayload = github.context.payload as PushEvent;
-    //   commitMessage = pushPayload.head_commit?.message ?? "";
-    // } else if (rest.isPullRequestType(github.context.eventName)) {
-    //   const prPayload = github.context.payload as PullRequestEvent;
-    //   ref = prPayload.pull_request.head.ref;
-    //   sha = prPayload.pull_request.head.sha;
-    //   const { data } = await rest.octokit.rest.git.getCommit({
-    //     ...github.context.repo,
-    //     commit_sha: sha,
-    //   });
-    //   commitMessage = data.message;
-    // }
+    let commitMessage = "";
+    if (github.context.eventName === "push") {
+        const pushPayload = github.context.payload;
+        commitMessage = pushPayload.head_commit?.message ?? "";
+    }
+    else if (rest.isPullRequestType(github.context.eventName)) {
+        const prPayload = github.context.payload;
+        ref = prPayload.pull_request.head.ref;
+        sha = prPayload.pull_request.head.sha;
+        const { data } = await rest.octokit.rest.git.getCommit({
+            ...github.context.repo,
+            commit_sha: sha,
+        });
+        commitMessage = data.message;
+    }
+    console.log(ref);
     // core.startGroup("Setting pending comment");
     // await rest.createComment({ commitSha: sha });
     // core.endGroup();
