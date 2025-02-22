@@ -65,14 +65,12 @@ export class Rest {
   }
 
   private buildCommentPrefix(name: string) {
-    return `Deployment for _${name}_ is ready!`;
+    return `The deployment for _${name}_ is ready!`;
   }
 
   private buildCommentBody(context: CommentContext) {
     return [
       this.buildCommentPrefix(context.name),
-      "",
-      "This pull request has been deployed to Vercel.",
       "",
       "<table>",
       "<tr>",
@@ -123,17 +121,7 @@ export class Rest {
   }
 
   private async findPreviousComment(text: string) {
-    core.info("find comment");
     const { data: comments } = await this.findCommentsForEvent();
-
-    const vercelPreviewURLComment = comments.find((comment) =>
-      comment.body?.startsWith(text),
-    );
-    if (vercelPreviewURLComment) {
-      core.info("previous comment found");
-      return vercelPreviewURLComment.id;
-    }
-    core.info("previous comment not found");
-    return null;
+    return comments.find((comment) => comment.body?.startsWith(text))?.id;
   }
 }

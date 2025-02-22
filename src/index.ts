@@ -29,7 +29,7 @@ async function run() {
     const prPayload = github.context.payload as PullRequestEvent;
 
     ref = prPayload.pull_request.head.ref;
-    sha = prPayload.pull_request.head.sha;
+    sha = prPayload.pull_request.head.sha.slice(0, 7);
 
     const { data } = await rest.octokit.rest.git.getCommit({
       ...github.context.repo,
@@ -40,26 +40,22 @@ async function run() {
 
   core.startGroup("Deploying to Vercel");
   const deploymentUrl = await vercel.deploy(ref, commitMessage);
-  if (deploymentUrl) {
-    core.info(`Setting preview URL to ${deploymentUrl}`);
-    core.setOutput("preview-url", deploymentUrl);
-  } else {
+  if (!deploymentUrl) {
     core.warning("Couldn't get preview URL");
   }
   core.endGroup();
 
+  core.startGroup("Inspecting deployment");
   const deploymentName =
     vercel.projectName || (await vercel.inspect(deploymentUrl));
-  if (deploymentName) {
-    core.info("set preview-name output");
-    core.setOutput("preview-name", deploymentName);
-  } else {
+  if (!deploymentName) {
     core.warning("get preview-name error");
   }
+  core.endGroup();
 
+  core.startGroup("Adding or updating comment");
   if (deploymentName) {
     if (github.context.issue.number) {
-      core.info("this is related issue or pull_request");
       await rest.createCommentOnPullRequest({
         commitSha: sha,
         name: deploymentName,
@@ -67,7 +63,6 @@ async function run() {
         inspectorUrl: `${deploymentUrl}/inspect`,
       });
     } else if (github.context.eventName === "push") {
-      core.info("this is push event");
       await rest.createCommentOnCommit({
         commitSha: sha,
         name: deploymentName,
@@ -76,6 +71,7 @@ async function run() {
       });
     }
   }
+  core.endGroup();
 }
 
 (async () => {

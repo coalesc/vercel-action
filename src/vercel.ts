@@ -18,6 +18,13 @@ export class Vercel {
     return this.privProjectName;
   }
 
+  async setEnv() {
+    core.info("Setting environment variables for Vercel CLI");
+    if (this.orgId) core.exportVariable("VERCEL_ORG_ID", this.orgId);
+    if (this.projectId)
+      core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
+  }
+
   async deploy(ref: string, commit: string) {
     const providedArgs = this.parseArgs(this.args);
 
@@ -118,17 +125,5 @@ export class Vercel {
     }
 
     return args;
-  }
-
-  async setEnv() {
-    core.info("Set environment data for Vercel CLI");
-    if (this.orgId) {
-      core.info("Set env variable: VERCEL_ORG_ID");
-      core.exportVariable("VERCEL_ORG_ID", this.orgId);
-    }
-    if (this.projectId) {
-      core.info("Set env variable: VERCEL_PROJECT_ID");
-      core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
-    }
   }
 }

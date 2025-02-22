@@ -31731,13 +31731,11 @@ class Rest {
         }
     }
     buildCommentPrefix(name) {
-        return `Deployment for _${name}_ is ready!`;
+        return `The deployment for _${name}_ is ready!`;
     }
     buildCommentBody(context) {
         return [
             this.buildCommentPrefix(context.name),
-            "",
-            "This pull request has been deployed to Vercel.",
             "",
             "<table>",
             "<tr>",
@@ -31783,15 +31781,8 @@ class Rest {
         return defaultResponse;
     }
     async findPreviousComment(text) {
-        core.info("find comment");
         const { data: comments } = await this.findCommentsForEvent();
-        const vercelPreviewURLComment = comments.find((comment) => comment.body?.startsWith(text));
-        if (vercelPreviewURLComment) {
-            core.info("previous comment found");
-            return vercelPreviewURLComment.id;
-        }
-        core.info("previous comment not found");
-        return null;
+        return comments.find((comment) => comment.body?.startsWith(text))?.id;
     }
 }
 
@@ -31814,6 +31805,13 @@ class Vercel {
     bin = `vercel@${core.getInput("vercel-version") || package_namespaceObject.El.II}`;
     get projectName() {
         return this.privProjectName;
+    }
+    async setEnv() {
+        core.info("Setting environment variables for Vercel CLI");
+        if (this.orgId)
+            core.exportVariable("VERCEL_ORG_ID", this.orgId);
+        if (this.projectId)
+            core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
     }
     async deploy(ref, commit) {
         const providedArgs = this.parseArgs(this.args);
@@ -31881,17 +31879,6 @@ class Vercel {
         }
         return args;
     }
-    async setEnv() {
-        core.info("Set environment data for Vercel CLI");
-        if (this.orgId) {
-            core.info("Set env variable: VERCEL_ORG_ID");
-            core.exportVariable("VERCEL_ORG_ID", this.orgId);
-        }
-        if (this.projectId) {
-            core.info("Set env variable: VERCEL_PROJECT_ID");
-            core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
-        }
-    }
 }
 
 ;// CONCATENATED MODULE: ./src/index.ts
@@ -31920,7 +31907,7 @@ async function run() {
     else if (rest.isPullRequestType(github.context.eventName)) {
         const prPayload = github.context.payload;
         ref = prPayload.pull_request.head.ref;
-        sha = prPayload.pull_request.head.sha;
+        sha = prPayload.pull_request.head.sha.slice(0, 7);
         const { data } = await rest.octokit.rest.git.getCommit({
             ...github.context.repo,
             commit_sha: sha,
@@ -31929,25 +31916,19 @@ async function run() {
     }
     core.startGroup("Deploying to Vercel");
     const deploymentUrl = await vercel.deploy(ref, commitMessage);
-    if (deploymentUrl) {
-        core.info(`Setting preview URL to ${deploymentUrl}`);
-        core.setOutput("preview-url", deploymentUrl);
-    }
-    else {
+    if (!deploymentUrl) {
         core.warning("Couldn't get preview URL");
     }
     core.endGroup();
+    core.startGroup("Inspecting deployment");
     const deploymentName = vercel.projectName || (await vercel.inspect(deploymentUrl));
-    if (deploymentName) {
-        core.info("set preview-name output");
-        core.setOutput("preview-name", deploymentName);
-    }
-    else {
+    if (!deploymentName) {
         core.warning("get preview-name error");
     }
+    core.endGroup();
+    core.startGroup("Adding or updating comment");
     if (deploymentName) {
         if (github.context.issue.number) {
-            core.info("this is related issue or pull_request");
             await rest.createCommentOnPullRequest({
                 commitSha: sha,
                 name: deploymentName,
@@ -31956,7 +31937,6 @@ async function run() {
             });
         }
         else if (github.context.eventName === "push") {
-            core.info("this is push event");
             await rest.createCommentOnCommit({
                 commitSha: sha,
                 name: deploymentName,
@@ -31965,6 +31945,7 @@ async function run() {
             });
         }
     }
+    core.endGroup();
 }
 (async () => {
     try {
