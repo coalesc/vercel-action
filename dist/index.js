@@ -31907,13 +31907,14 @@ async function run() {
     else if (rest.isPullRequestType(github.context.eventName)) {
         const prPayload = github.context.payload;
         ref = prPayload.pull_request.head.ref;
-        sha = prPayload.pull_request.head.sha.slice(0, 7);
+        sha = prPayload.pull_request.head.sha;
         const { data } = await rest.octokit.rest.git.getCommit({
             ...github.context.repo,
             commit_sha: sha,
         });
         commitMessage = data.message;
     }
+    sha = sha.slice(0, 7);
     core.startGroup("Deploying to Vercel");
     const deploymentUrl = await vercel.deploy(ref, commitMessage);
     if (!deploymentUrl) {

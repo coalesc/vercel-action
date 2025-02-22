@@ -29,7 +29,7 @@ async function run() {
     const prPayload = github.context.payload as PullRequestEvent;
 
     ref = prPayload.pull_request.head.ref;
-    sha = prPayload.pull_request.head.sha.slice(0, 7);
+    sha = prPayload.pull_request.head.sha;
 
     const { data } = await rest.octokit.rest.git.getCommit({
       ...github.context.repo,
@@ -37,6 +37,7 @@ async function run() {
     });
     commitMessage = data.message;
   }
+  sha = sha.slice(0, 7);
 
   core.startGroup("Deploying to Vercel");
   const deploymentUrl = await vercel.deploy(ref, commitMessage);
