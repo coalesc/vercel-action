@@ -40,11 +40,14 @@ async function run() {
   core.endGroup();
 
   console.log(
-    await rest.octokit.rest.repos.checkCollaborator({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      username: "hello",
-    }),
+    await rest.octokit.rest.repos
+      .checkCollaborator({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        username: "hello",
+      })
+      .then(() => true)
+      .catch(() => false),
   );
 
   // let commitMessage = "";
