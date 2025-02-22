@@ -31914,6 +31914,11 @@ async function run() {
         ].join("\n"),
     });
     core.endGroup();
+    console.log(await rest.octokit.rest.repos.checkCollaborator({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        username: github.context.actor,
+    }));
     // let commitMessage = "";
     // if (github.context.eventName === "push") {
     //   const pushPayload = github.context.payload as PushEvent;
