@@ -31973,7 +31973,7 @@ async function run() {
         commitMessage = data.message;
     }
     core.startGroup("Setting deployment status");
-    const { status, data } = await rest.createDeployment(ref);
+    const { status, data } = await rest.createDeployment(sha);
     if (status !== 201) {
         core.warning("Couldn't create deployment");
     }
