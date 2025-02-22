@@ -69,7 +69,6 @@ async function run() {
 
   core.startGroup("Setting deployment status");
   const { status, data } = await rest.createDeployment(ref);
-  console.log(status);
   if (status !== 201) {
     core.warning("Couldn't create deployment");
   } else {

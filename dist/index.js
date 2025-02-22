@@ -31722,6 +31722,7 @@ class Rest {
         return this.octokit.rest.repos.createDeployment({
             ...deploymentOptions,
             ref,
+            required_contexts: [],
         });
     }
     async updateDeployment(id, state, urls) {
@@ -31973,7 +31974,6 @@ async function run() {
     }
     core.startGroup("Setting deployment status");
     const { status, data } = await rest.createDeployment(ref);
-    console.log(status);
     if (status !== 201) {
         core.warning("Couldn't create deployment");
     }

@@ -55,6 +55,7 @@ export class Rest {
     return this.octokit.rest.repos.createDeployment({
       ...deploymentOptions,
       ref,
+      required_contexts: [],
     });
   }
 
