@@ -67,13 +67,16 @@ async function run() {
     commitMessage = data.message;
   }
 
+  core.startGroup("Setting deployment status");
   const { status, data } = await rest.createDeployment(ref);
+  console.log(data);
   if (status !== 201) {
     core.warning("Couldn't create deployment");
   } else {
     deploymentId = data.id;
     await rest.updateDeployment(deploymentId, "pending");
   }
+  core.endGroup();
 
   core.startGroup("Setting pending comment");
   await rest.createComment({ commitSha: sha });
@@ -105,19 +108,24 @@ async function run() {
   });
   core.endGroup();
 
+  core.startGroup("Updating deployment status");
   if (!Number.isNaN(deploymentId))
     await rest.updateDeployment(deploymentId, "success", {
       deploymentUrl,
       inspectUrl,
     });
+  core.endGroup();
 }
 
 (async () => {
   try {
     await run();
   } catch (error: unknown) {
-    core.setFailed((error as { message: string }).message);
+    core.startGroup("Updating deployment status");
     if (!Number.isNaN(deploymentId))
       await rest.updateDeployment(deploymentId, "failure");
+    core.endGroup();
+
+    core.setFailed((error as { message: string }).message);
   }
 })();
