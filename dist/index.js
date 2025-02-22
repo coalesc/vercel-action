@@ -31839,11 +31839,9 @@ class Vercel {
             listeners: {
                 stdout: (data) => {
                     output += data.toString();
-                    core.info(data.toString());
                 },
                 stderr: (data) => {
                     error += data.toString();
-                    core.info(data.toString());
                 },
             },
         });
@@ -31861,7 +31859,6 @@ class Vercel {
             listeners: {
                 stderr: (data) => {
                     error += data.toString();
-                    core.info(data.toString());
                 },
             },
         });
