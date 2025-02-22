@@ -9,7 +9,7 @@ interface Comment {
 interface CommentContext {
   name: string;
   commitSha: string;
-  inspectorUrl: string;
+  inspectUrl: string;
   deploymentUrl: string;
 }
 
@@ -65,7 +65,7 @@ export class Rest {
   }
 
   private buildCommentPrefix(name: string) {
-    return `The deployment for _${name}_ is ready!`;
+    return "<!-- VERCEL DEPLOYMENT COMMENT -->";
   }
 
   private buildCommentBody(context: CommentContext) {
@@ -74,20 +74,30 @@ export class Rest {
       "",
       "<table>",
       "<tr>",
-      "<td><strong>Latest commit:</strong></td>",
-      `<td><code>${context.commitSha}</code></td>`,
+      "<td><strong>Name:</strong></td>",
+      `<td>${context.name}</td>`,
       "</tr>",
       "<tr>",
-      "<td><strong>✅ Preview:</strong></td>",
-      `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
+      "<td><strong>Latest commit:</strong></td>",
+      `<td>${context.commitSha}</td>`,
+      "</tr>",
+      "<tr>",
+      "<td><strong>⏰ Status:</strong></td>",
+      "<td>Ready</td>",
       "</tr>",
       "<tr>",
       "<td><strong>🔍 Inspect:</strong></td>",
-      `<td><a href='${context.inspectorUrl}'>${context.inspectorUrl}</a></td>`,
+      `<td><a href='${context.inspectUrl}'>${context.inspectUrl}</a></td>`,
+      "</tr>",
+      "<tr>",
+      "<td><strong>✅ Deployment:</strong></td>",
+      `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
+      "</tr>",
+      "<tr>",
+      "<td><strong>📝 Workflow Logs:</strong></td>",
+      `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
       "</tr>",
       "</table>",
-      "",
-      `[View Workflow Logs](${`https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}`})`,
     ].join("\n");
   }
 

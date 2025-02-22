@@ -38,15 +38,11 @@ async function run() {
     });
     commitMessage = data.message;
   }
-  sha = sha.slice(0, 7);
 
   core.startGroup("Deploying to Vercel");
-  const { deploymentUrl, inspectorUrl } = await vercel.deploy(
-    ref,
-    commitMessage,
-  );
-  if (!deploymentUrl || !inspectorUrl) {
-    core.warning("Couldn't get deployment or inspector URL");
+  const { deploymentUrl, inspectUrl } = await vercel.deploy(ref, commitMessage);
+  if (!deploymentUrl || !inspectUrl) {
+    core.warning("Couldn't get deployment or inspect URL");
   }
   core.endGroup();
 
@@ -60,14 +56,14 @@ async function run() {
   if (deploymentName) {
     if (github.context.issue.number) {
       await rest.createCommentOnPullRequest({
-        inspectorUrl,
+        inspectUrl,
         deploymentUrl,
         commitSha: sha,
         name: deploymentName,
       });
     } else if (github.context.eventName === "push") {
       await rest.createCommentOnCommit({
-        inspectorUrl,
+        inspectUrl,
         deploymentUrl,
         commitSha: sha,
         name: deploymentName,

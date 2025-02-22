@@ -74,7 +74,7 @@ export class Vercel {
     }
 
     let deploymentUrl = "";
-    let inspectorUrl = "";
+    let inspectUrl = "";
     await exec.exec("npx", [this.bin, ...args], {
       listeners: {
         stdout: (data) => {
@@ -82,12 +82,12 @@ export class Vercel {
         },
         stderr: (data) => {
           if (data.toString().startsWith("Inspect: https://vercel.com"))
-            inspectorUrl = data.toString().replace("Inspect: ", "");
+            inspectUrl = data.toString().replace("Inspect: ", "");
         },
       },
     });
 
-    return { deploymentUrl, inspectorUrl };
+    return { deploymentUrl, inspectUrl };
   }
 
   async inspect(deploymentUrl: string) {
