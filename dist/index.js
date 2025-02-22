@@ -31824,7 +31824,7 @@ class Vercel {
     }
     async disableTelemetry() {
         core.info("Disabling telemetry for Vercel CLI");
-        await exec.exec("vercel", ["telemetry", "disable"]);
+        await exec.exec("npx", [this.bin, "telemetry", "disable"]);
     }
     async deploy(ref, commit) {
         const args = [...this.parseArgs(this.args), ...["-t", this.token]];
