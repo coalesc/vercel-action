@@ -31701,7 +31701,7 @@ class Rest {
             await this.createCommentOnCommit(context);
     }
     async createCommentOnCommit(context) {
-        const commentBody = context.body ?? this.buildCommentBody(context);
+        const commentBody = this.buildCommentBody(context);
         const commentId = await this.findPreviousComment(this.buildCommentPrefix());
         if (commentId) {
             await this.octokit.rest.repos.updateCommitComment({
@@ -31719,7 +31719,7 @@ class Rest {
         }
     }
     async createCommentOnPullRequest(context) {
-        const commentBody = context.body ?? this.buildCommentBody(context);
+        const commentBody = this.buildCommentBody(context);
         const commentId = await this.findPreviousComment(this.buildCommentPrefix());
         if (commentId) {
             await this.octokit.rest.issues.updateComment({
@@ -31743,33 +31743,37 @@ class Rest {
         return [
             this.buildCommentPrefix(),
             "",
-            "<table>",
-            "<tr>",
-            "<td><strong>Latest commit:</strong></td>",
-            `<td>${context.commitSha}</td>`,
-            "</tr>",
-            "<tr>",
-            "<td><strong>Name:</strong></td>",
-            `<td>${context.name ?? "N/A"}</td>`,
-            "</tr>",
-            "<tr>",
-            "<td><strong>⏰ Status:</strong></td>",
-            `<td>${!context.inspectUrl ? "Pending" : "Ready"}</td>`,
-            "</tr>",
-            "<tr>",
-            "<td><strong>✅ Deployment:</strong></td>",
-            `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.deploymentUrl}'>${context.deploymentUrl}</a>`}</td>`,
-            "</tr>",
-            "<tr>",
-            "<td><strong>🔍 Inspect:</strong></td>",
-            `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.inspectUrl}'>Visit Vercel dashboard</a>`}</td>`,
-            "</tr>",
-            "<tr>",
-            "<td><strong>📝 Workflow Logs:</strong></td>",
-            `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
-            "</tr>",
-            "</table>",
-        ].join("\n");
+            context.body ?? [
+                "<table>",
+                "<tr>",
+                "<td><strong>Latest commit:</strong></td>",
+                `<td>${context.commitSha}</td>`,
+                "</tr>",
+                "<tr>",
+                "<td><strong>Name:</strong></td>",
+                `<td>${context.name ?? "N/A"}</td>`,
+                "</tr>",
+                "<tr>",
+                "<td><strong>⏰ Status:</strong></td>",
+                `<td>${!context.inspectUrl ? "Pending" : "Ready"}</td>`,
+                "</tr>",
+                "<tr>",
+                "<td><strong>✅ Deployment:</strong></td>",
+                `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.deploymentUrl}'>${context.deploymentUrl}</a>`}</td>`,
+                "</tr>",
+                "<tr>",
+                "<td><strong>🔍 Inspect:</strong></td>",
+                `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.inspectUrl}'>Visit Vercel dashboard</a>`}</td>`,
+                "</tr>",
+                "<tr>",
+                "<td><strong>📝 Workflow Logs:</strong></td>",
+                `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
+                "</tr>",
+                "</table>",
+            ],
+        ]
+            .flat()
+            .join("\n");
     }
     async findCommentsForEvent() {
         const defaultResponse = {
@@ -31907,9 +31911,7 @@ async function run() {
     core.startGroup("Setting forked comment");
     await rest.createComment({
         body: [
-            "⚠️ This PR is from a repository outside your account so it will not be deployed.",
-            "",
-            `If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
+            `⚠️ This PR is from a repository outside your account so it will not be deployed. If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
             "- [ ] Allow deployment",
         ].join("\n"),
     });

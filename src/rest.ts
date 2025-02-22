@@ -31,7 +31,7 @@ export class Rest {
   }
 
   private async createCommentOnCommit(context: CommentContext) {
-    const commentBody = context.body ?? this.buildCommentBody(context);
+    const commentBody = this.buildCommentBody(context);
     const commentId = await this.findPreviousComment(this.buildCommentPrefix());
 
     if (commentId) {
@@ -50,7 +50,7 @@ export class Rest {
   }
 
   private async createCommentOnPullRequest(context: CommentContext) {
-    const commentBody = context.body ?? this.buildCommentBody(context);
+    const commentBody = this.buildCommentBody(context);
     const commentId = await this.findPreviousComment(this.buildCommentPrefix());
 
     if (commentId) {
@@ -76,33 +76,37 @@ export class Rest {
     return [
       this.buildCommentPrefix(),
       "",
-      "<table>",
-      "<tr>",
-      "<td><strong>Latest commit:</strong></td>",
-      `<td>${context.commitSha}</td>`,
-      "</tr>",
-      "<tr>",
-      "<td><strong>Name:</strong></td>",
-      `<td>${context.name ?? "N/A"}</td>`,
-      "</tr>",
-      "<tr>",
-      "<td><strong>⏰ Status:</strong></td>",
-      `<td>${!context.inspectUrl ? "Pending" : "Ready"}</td>`,
-      "</tr>",
-      "<tr>",
-      "<td><strong>✅ Deployment:</strong></td>",
-      `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.deploymentUrl}'>${context.deploymentUrl}</a>`}</td>`,
-      "</tr>",
-      "<tr>",
-      "<td><strong>🔍 Inspect:</strong></td>",
-      `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.inspectUrl}'>Visit Vercel dashboard</a>`}</td>`,
-      "</tr>",
-      "<tr>",
-      "<td><strong>📝 Workflow Logs:</strong></td>",
-      `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
-      "</tr>",
-      "</table>",
-    ].join("\n");
+      context.body ?? [
+        "<table>",
+        "<tr>",
+        "<td><strong>Latest commit:</strong></td>",
+        `<td>${context.commitSha}</td>`,
+        "</tr>",
+        "<tr>",
+        "<td><strong>Name:</strong></td>",
+        `<td>${context.name ?? "N/A"}</td>`,
+        "</tr>",
+        "<tr>",
+        "<td><strong>⏰ Status:</strong></td>",
+        `<td>${!context.inspectUrl ? "Pending" : "Ready"}</td>`,
+        "</tr>",
+        "<tr>",
+        "<td><strong>✅ Deployment:</strong></td>",
+        `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.deploymentUrl}'>${context.deploymentUrl}</a>`}</td>`,
+        "</tr>",
+        "<tr>",
+        "<td><strong>🔍 Inspect:</strong></td>",
+        `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.inspectUrl}'>Visit Vercel dashboard</a>`}</td>`,
+        "</tr>",
+        "<tr>",
+        "<td><strong>📝 Workflow Logs:</strong></td>",
+        `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
+        "</tr>",
+        "</table>",
+      ],
+    ]
+      .flat()
+      .join("\n");
   }
 
   private async findCommentsForEvent(): Promise<{ data: Comment[] }> {

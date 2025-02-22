@@ -33,9 +33,7 @@ async function run() {
   core.startGroup("Setting forked comment");
   await rest.createComment({
     body: [
-      "⚠️ This PR is from a repository outside your account so it will not be deployed.",
-      "",
-      `If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
+      `⚠️ This PR is from a repository outside your account so it will not be deployed. If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
       "- [ ] Allow deployment",
     ].join("\n"),
   });
