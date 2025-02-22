@@ -31834,15 +31834,20 @@ class Vercel {
             args.push("--scope", this.scope);
         }
         let output = "";
+        let error = "";
         await exec.exec("npx", [this.bin, ...args], {
             listeners: {
                 stdout: (data) => {
                     output += data.toString();
                     core.info(data.toString());
                 },
+                stderr: (data) => {
+                    error += data.toString();
+                    core.info(data.toString());
+                },
             },
         });
-        console.log(output);
+        core.info(`adsd ${error}`);
         return output;
     }
     async inspect(deploymentUrl) {
