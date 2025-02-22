@@ -31731,7 +31731,7 @@ class Rest {
         }
     }
     buildCommentPrefix(name) {
-        return `The deployment for _${name}_ is ready!`;
+        return "<!-- VERCEL DEPLOYMENT COMMENT -->";
     }
     buildCommentBody(context) {
         return [
@@ -31739,20 +31739,30 @@ class Rest {
             "",
             "<table>",
             "<tr>",
-            "<td><strong>Latest commit:</strong></td>",
-            `<td><code>${context.commitSha}</code></td>`,
+            "<td><strong>Name:</strong></td>",
+            `<td>${context.name}</td>`,
             "</tr>",
             "<tr>",
-            "<td><strong>✅ Preview:</strong></td>",
-            `<td><a href='${context.previewUrl}'>${context.previewUrl}</a></td>`,
+            "<td><strong>Latest commit:</strong></td>",
+            `<td>${context.commitSha}</td>`,
+            "</tr>",
+            "<tr>",
+            "<td><strong>⏰ Status:</strong></td>",
+            "<td>Ready</td>",
             "</tr>",
             "<tr>",
             "<td><strong>🔍 Inspect:</strong></td>",
-            `<td><a href='${context.inspectorUrl}'>${context.inspectorUrl}</a></td>`,
+            `<td><a href='${context.inspectUrl}'>${context.inspectUrl}</a></td>`,
+            "</tr>",
+            "<tr>",
+            "<td><strong>✅ Deployment:</strong></td>",
+            `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
+            "</tr>",
+            "<tr>",
+            "<td><strong>📝 Workflow Logs:</strong></td>",
+            `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
             "</tr>",
             "</table>",
-            "",
-            `[View Workflow Logs](${`https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}`})`,
         ].join("\n");
     }
     async findCommentsForEvent() {
@@ -31794,7 +31804,6 @@ const package_namespaceObject = /*#__PURE__*/JSON.parse('{"El":{"II":"^41.2.0"}}
 
 
 
-
 class Vercel {
     token = core.getInput("vercel-token", { required: true });
     orgId = core.getInput("vercel-org-id", { required: true });
@@ -31813,40 +31822,30 @@ class Vercel {
         if (this.projectId)
             core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
     }
+    async disableTelemetry() {
+        core.info("Disabling telemetry for Vercel CLI");
+        await exec.exec("vercel", ["telemetry", "disable"]);
+    }
     async deploy(ref, commit) {
-        const providedArgs = this.parseArgs(this.args);
-        const args = [
-            ...providedArgs,
-            ...["-t", this.token],
-            ...this.addMetadata("githubCommitSha", github.context.sha, providedArgs),
-            ...this.addMetadata("githubCommitAuthorName", github.context.actor, providedArgs),
-            ...this.addMetadata("githubCommitAuthorLogin", github.context.actor, providedArgs),
-            ...this.addMetadata("githubDeployment", 1, providedArgs),
-            ...this.addMetadata("githubOrg", github.context.repo.owner, providedArgs),
-            ...this.addMetadata("githubRepo", github.context.repo.repo, providedArgs),
-            ...this.addMetadata("githubCommitOrg", github.context.repo.owner, providedArgs),
-            ...this.addMetadata("githubCommitRepo", github.context.repo.repo, providedArgs),
-            ...this.addMetadata("githubCommitMessage", `"${commit}"`, providedArgs),
-            ...this.addMetadata("githubCommitRef", ref.replace("refs/heads/", ""), providedArgs),
-        ];
+        const args = [...this.parseArgs(this.args), ...["-t", this.token]];
         if (this.scope) {
             core.info("using scope");
             args.push("--scope", this.scope);
         }
-        let output = "";
-        let error = "";
+        let deploymentUrl = "";
+        let inspectUrl = "";
         await exec.exec("npx", [this.bin, ...args], {
             listeners: {
                 stdout: (data) => {
-                    output += data.toString();
+                    deploymentUrl += data.toString();
                 },
                 stderr: (data) => {
-                    error += data.toString();
+                    if (data.toString().startsWith("Inspect: https://vercel.com"))
+                        inspectUrl = data.toString().replace("Inspect: ", "");
                 },
             },
         });
-        core.info(`adsd ${error}`);
-        return output;
+        return { deploymentUrl, inspectUrl };
     }
     async inspect(deploymentUrl) {
         const args = [this.bin, "inspect", deploymentUrl, "-t", this.token];
@@ -31901,6 +31900,7 @@ async function run() {
     }
     let { ref, sha } = github.context;
     await vercel.setEnv();
+    await vercel.disableTelemetry();
     let commitMessage = "";
     if (github.context.eventName === "push") {
         const pushPayload = github.context.payload;
@@ -31916,35 +31916,33 @@ async function run() {
         });
         commitMessage = data.message;
     }
-    sha = sha.slice(0, 7);
     core.startGroup("Deploying to Vercel");
-    const deploymentUrl = await vercel.deploy(ref, commitMessage);
-    if (!deploymentUrl) {
-        core.warning("Couldn't get preview URL");
+    const { deploymentUrl, inspectUrl } = await vercel.deploy(ref, commitMessage);
+    if (!deploymentUrl || !inspectUrl) {
+        core.warning("Couldn't get deployment or inspect URL");
     }
     core.endGroup();
     core.startGroup("Inspecting deployment");
     const deploymentName = vercel.projectName || (await vercel.inspect(deploymentUrl));
-    if (!deploymentName) {
-        core.warning("get preview-name error");
-    }
+    if (!deploymentName)
+        core.warning("Couldn't get deployment name");
     core.endGroup();
     core.startGroup("Adding or updating comment");
     if (deploymentName) {
         if (github.context.issue.number) {
             await rest.createCommentOnPullRequest({
+                inspectUrl,
+                deploymentUrl,
                 commitSha: sha,
                 name: deploymentName,
-                previewUrl: deploymentUrl,
-                inspectorUrl: `${deploymentUrl}/inspect`,
             });
         }
         else if (github.context.eventName === "push") {
             await rest.createCommentOnCommit({
+                inspectUrl,
+                deploymentUrl,
                 commitSha: sha,
                 name: deploymentName,
-                previewUrl: deploymentUrl,
-                inspectorUrl: `${deploymentUrl}/inspect`,
             });
         }
     }

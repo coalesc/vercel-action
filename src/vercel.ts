@@ -1,6 +1,5 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as github from "@actions/github";
 
 import packageJSON from "../package.json" assert { type: "json" };
 
@@ -31,43 +30,7 @@ export class Vercel {
   }
 
   async deploy(ref: string, commit: string) {
-    const providedArgs = this.parseArgs(this.args);
-
-    const args = [
-      ...providedArgs,
-      ...["-t", this.token],
-      ...this.addMetadata("githubCommitSha", github.context.sha, providedArgs),
-      ...this.addMetadata(
-        "githubCommitAuthorName",
-        github.context.actor,
-        providedArgs,
-      ),
-      ...this.addMetadata(
-        "githubCommitAuthorLogin",
-        github.context.actor,
-        providedArgs,
-      ),
-      ...this.addMetadata("githubDeployment", 1, providedArgs),
-      ...this.addMetadata("githubOrg", github.context.repo.owner, providedArgs),
-      ...this.addMetadata("githubRepo", github.context.repo.repo, providedArgs),
-      ...this.addMetadata(
-        "githubCommitOrg",
-        github.context.repo.owner,
-        providedArgs,
-      ),
-      ...this.addMetadata(
-        "githubCommitRepo",
-        github.context.repo.repo,
-        providedArgs,
-      ),
-      ...this.addMetadata("githubCommitMessage", `"${commit}"`, providedArgs),
-      ...this.addMetadata(
-        "githubCommitRef",
-        ref.replace("refs/heads/", ""),
-        providedArgs,
-      ),
-    ];
-
+    const args = [...this.parseArgs(this.args), ...["-t", this.token]];
     if (this.scope) {
       core.info("using scope");
       args.push("--scope", this.scope);
