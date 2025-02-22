@@ -26,6 +26,9 @@ inputs:
   scope:
     required: false
     description: "If you are work in team scope, you should set this value to your team id."
+  environment:
+    required: true
+    description: "Environment name."
 
 runs:
   using: "node20"

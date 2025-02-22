@@ -31689,8 +31689,16 @@ var github = __nccwpck_require__(3228);
 ;// CONCATENATED MODULE: ./src/rest.ts
 
 
+const deploymentOptions = {
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    environment: core.getInput("environment", { required: true }),
+};
 class Rest {
     octokit = github.getOctokit(core.getInput("github-token", { required: true }));
+    get logUrl() {
+        return `https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}`;
+    }
     isPullRequestType(event) {
         return event.startsWith("pull_request");
     }
@@ -31709,6 +31717,21 @@ class Rest {
         })
             .then(() => true)
             .catch(() => false);
+    }
+    async createDeployment(ref) {
+        return this.octokit.rest.repos.createDeployment({
+            ...deploymentOptions,
+            ref,
+        });
+    }
+    async updateDeployment(id, state, urls) {
+        return this.octokit.rest.repos.createDeploymentStatus({
+            ...deploymentOptions,
+            deployment_id: id,
+            state,
+            environment_url: urls?.deploymentUrl,
+            log_url: urls?.inspectUrl ?? this.logUrl,
+        });
     }
     async createCommentOnCommit(context) {
         const commentBody = this.buildCommentBody(context);
@@ -31777,7 +31800,7 @@ class Rest {
                 "</tr>",
                 "<tr>",
                 "<td><strong>📝 Workflow Logs:</strong></td>",
-                `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
+                `<td><a href='${this.logUrl}'>View logs</a></td>`,
                 "</tr>",
                 "</table>",
             ],
@@ -31899,6 +31922,7 @@ class Vercel {
 
 const vercel = new Vercel();
 const rest = new Rest();
+let deploymentId = Number.NaN;
 async function run() {
     let { ref, sha } = github.context;
     const forkBody = [
@@ -31947,32 +31971,44 @@ async function run() {
         });
         commitMessage = data.message;
     }
-    console.log(ref);
-    // core.startGroup("Setting pending comment");
-    // await rest.createComment({ commitSha: sha });
-    // core.endGroup();
-    // await vercel.setEnv();
-    // core.startGroup("Disabling telemetry for Vercel CLI");
-    // await vercel.disableTelemetry();
-    // core.endGroup();
-    // core.startGroup("Deploying to Vercel");
-    // const { deploymentUrl, inspectUrl } = await vercel.deploy(ref, commitMessage);
-    // if (!deploymentUrl || !inspectUrl)
-    //   core.warning("Couldn't get deployment or inspect URL");
-    // core.endGroup();
-    // core.startGroup("Inspecting deployment");
-    // const deploymentName =
-    //   vercel.projectName || (await vercel.inspect(deploymentUrl));
-    // if (!deploymentName) core.warning("Couldn't get deployment name");
-    // core.endGroup();
-    // core.startGroup("Setting ready comment");
-    // await rest.createComment({
-    //   inspectUrl,
-    //   deploymentUrl,
-    //   commitSha: sha,
-    //   name: deploymentName ?? undefined,
-    // });
-    // core.endGroup();
+    const { status, data } = await rest.createDeployment(ref);
+    if (status !== 201) {
+        core.warning("Couldn't create deployment");
+    }
+    else {
+        deploymentId = data.id;
+        await rest.updateDeployment(deploymentId, "pending");
+    }
+    core.startGroup("Setting pending comment");
+    await rest.createComment({ commitSha: sha });
+    core.endGroup();
+    await vercel.setEnv();
+    core.startGroup("Disabling telemetry for Vercel CLI");
+    await vercel.disableTelemetry();
+    core.endGroup();
+    core.startGroup("Deploying to Vercel");
+    const { deploymentUrl, inspectUrl } = await vercel.deploy(ref, commitMessage);
+    if (!deploymentUrl || !inspectUrl)
+        core.warning("Couldn't get deployment or inspect URL");
+    core.endGroup();
+    core.startGroup("Inspecting deployment");
+    const deploymentName = vercel.projectName || (await vercel.inspect(deploymentUrl));
+    if (!deploymentName)
+        core.warning("Couldn't get deployment name");
+    core.endGroup();
+    core.startGroup("Setting ready comment");
+    await rest.createComment({
+        inspectUrl,
+        deploymentUrl,
+        commitSha: sha,
+        name: deploymentName ?? undefined,
+    });
+    core.endGroup();
+    if (!Number.isNaN(deploymentId))
+        await rest.updateDeployment(deploymentId, "success", {
+            deploymentUrl,
+            inspectUrl,
+        });
 }
 (async () => {
     try {
@@ -31980,6 +32016,8 @@ async function run() {
     }
     catch (error) {
         core.setFailed(error.message);
+        if (!Number.isNaN(deploymentId))
+            await rest.updateDeployment(deploymentId, "failure");
     }
 })();
 

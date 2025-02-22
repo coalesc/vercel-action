@@ -14,10 +14,20 @@ interface CommentContext {
   deploymentUrl?: string;
 }
 
+const deploymentOptions = {
+  owner: github.context.repo.owner,
+  repo: github.context.repo.repo,
+  environment: core.getInput("environment", { required: true }),
+};
+
 export class Rest {
   octokit = github.getOctokit(
     core.getInput("github-token", { required: true }),
   );
+
+  private get logUrl() {
+    return `https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}`;
+  }
 
   isPullRequestType(event: string) {
     return event.startsWith("pull_request");
@@ -39,6 +49,31 @@ export class Rest {
       })
       .then(() => true)
       .catch(() => false);
+  }
+
+  async createDeployment(ref: string) {
+    return this.octokit.rest.repos.createDeployment({
+      ...deploymentOptions,
+      ref,
+    });
+  }
+
+  async updateDeployment(
+    id: number,
+    state: NonNullable<
+      Parameters<
+        (typeof this)["octokit"]["rest"]["repos"]["createDeploymentStatus"]
+      >[0]
+    >["state"],
+    urls?: Pick<CommentContext, "deploymentUrl" | "inspectUrl">,
+  ) {
+    return this.octokit.rest.repos.createDeploymentStatus({
+      ...deploymentOptions,
+      deployment_id: id,
+      state,
+      environment_url: urls?.deploymentUrl,
+      log_url: urls?.inspectUrl ?? this.logUrl,
+    });
   }
 
   private async createCommentOnCommit(context: CommentContext) {
@@ -111,7 +146,7 @@ export class Rest {
         "</tr>",
         "<tr>",
         "<td><strong>📝 Workflow Logs:</strong></td>",
-        `<td><a href='https://github.com/${github.context.repo.owner}/${github.context.repo.repo}/actions/runs/${github.context.runId}'>View logs</a></td>`,
+        `<td><a href='${this.logUrl}'>View logs</a></td>`,
         "</tr>",
         "</table>",
       ],
