@@ -31919,7 +31919,7 @@ async function run() {
     console.log(await rest.octokit.rest.repos.checkCollaborator({
         owner: github.context.repo.owner,
         repo: github.context.repo.repo,
-        username: github.context.actor,
+        username: "hello",
     }));
     // let commitMessage = "";
     // if (github.context.eventName === "push") {
