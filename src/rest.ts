@@ -9,8 +9,8 @@ interface Comment {
 interface CommentContext {
   name: string;
   commitSha: string;
-  previewUrl: string;
   inspectorUrl: string;
+  deploymentUrl: string;
 }
 
 export class Rest {
@@ -79,7 +79,7 @@ export class Rest {
       "</tr>",
       "<tr>",
       "<td><strong>✅ Preview:</strong></td>",
-      `<td><a href='${context.previewUrl}'>${context.previewUrl}</a></td>`,
+      `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
       "</tr>",
       "<tr>",
       "<td><strong>🔍 Inspect:</strong></td>",

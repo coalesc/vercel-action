@@ -20,6 +20,7 @@ async function run() {
 
   let { ref, sha } = github.context;
   await vercel.setEnv();
+  await vercel.disableTelemetry();
 
   let commitMessage = "";
   if (github.context.eventName === "push") {
@@ -40,35 +41,36 @@ async function run() {
   sha = sha.slice(0, 7);
 
   core.startGroup("Deploying to Vercel");
-  const deploymentUrl = await vercel.deploy(ref, commitMessage);
-  if (!deploymentUrl) {
-    core.warning("Couldn't get preview URL");
+  const { deploymentUrl, inspectorUrl } = await vercel.deploy(
+    ref,
+    commitMessage,
+  );
+  if (!deploymentUrl || !inspectorUrl) {
+    core.warning("Couldn't get deployment or inspector URL");
   }
   core.endGroup();
 
   core.startGroup("Inspecting deployment");
   const deploymentName =
     vercel.projectName || (await vercel.inspect(deploymentUrl));
-  if (!deploymentName) {
-    core.warning("get preview-name error");
-  }
+  if (!deploymentName) core.warning("Couldn't get deployment name");
   core.endGroup();
 
   core.startGroup("Adding or updating comment");
   if (deploymentName) {
     if (github.context.issue.number) {
       await rest.createCommentOnPullRequest({
+        inspectorUrl,
+        deploymentUrl,
         commitSha: sha,
         name: deploymentName,
-        previewUrl: deploymentUrl,
-        inspectorUrl: `${deploymentUrl}/inspect`,
       });
     } else if (github.context.eventName === "push") {
       await rest.createCommentOnCommit({
+        inspectorUrl,
+        deploymentUrl,
         commitSha: sha,
         name: deploymentName,
-        previewUrl: deploymentUrl,
-        inspectorUrl: `${deploymentUrl}/inspect`,
       });
     }
   }

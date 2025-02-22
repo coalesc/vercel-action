@@ -25,6 +25,11 @@ export class Vercel {
       core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
   }
 
+  async disableTelemetry() {
+    core.info("Disabling telemetry for Vercel CLI");
+    await exec.exec("vercel", ["telemetry", "disable"]);
+  }
+
   async deploy(ref: string, commit: string) {
     const providedArgs = this.parseArgs(this.args);
 
@@ -68,21 +73,21 @@ export class Vercel {
       args.push("--scope", this.scope);
     }
 
-    let output = "";
-    let error = "";
+    let deploymentUrl = "";
+    let inspectorUrl = "";
     await exec.exec("npx", [this.bin, ...args], {
       listeners: {
         stdout: (data) => {
-          output += data.toString();
+          deploymentUrl += data.toString();
         },
         stderr: (data) => {
-          error += data.toString();
+          if (data.toString().startsWith("Inspect: https://vercel.com"))
+            inspectorUrl = data.toString().replace("Inspect: ", "");
         },
       },
     });
 
-    core.info(`adsd ${error}`);
-    return output;
+    return { deploymentUrl, inspectorUrl };
   }
 
   async inspect(deploymentUrl: string) {
