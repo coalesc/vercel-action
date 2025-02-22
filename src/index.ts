@@ -1,6 +1,9 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
-import type { PullRequestEvent } from "@octokit/webhooks-types";
+import type {
+  IssueCommentEvent,
+  PullRequestEvent,
+} from "@octokit/webhooks-types";
 import { Rest } from "./rest.js";
 import { Vercel } from "./vercel.js";
 
@@ -10,45 +13,42 @@ const rest = new Rest();
 async function run() {
   const { ref, sha } = github.context;
 
+  const forkBody = [
+    "⚠️ This PR is from a repository outside your account so it will not be deployed.",
+    "",
+    `If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
+    "- [ ] Allow deployment",
+  ].join("\n");
   if (rest.isPullRequestType(github.context.eventName)) {
     const payload = github.context.payload as PullRequestEvent;
 
     const baseRepo = payload.pull_request.base.repo;
     if (github.context.repo.owner !== baseRepo.owner.login) {
       core.startGroup("Setting forked comment");
-      await rest.createComment({
-        body: [
-          "⚠️ This PR is from a repository outside your account so it will not be deployed.",
-          "",
-          `If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
-          "- [ ] Allow deployment",
-        ].join("\n"),
-      });
+      await rest.createComment({ body: forkBody });
       core.endGroup();
 
       return;
     }
+  } else if (github.context.eventName === "issue_comment") {
+    const payload = github.context.payload as IssueCommentEvent;
+    if (
+      payload.issue.state === "open" &&
+      payload.comment.body.includes("- [x] Allow deployment")
+    ) {
+      if (!(await rest.checkCollaborator())) {
+        core.startGroup("Setting forked comment");
+        await rest.createComment({ body: forkBody });
+        core.endGroup();
+
+        return;
+      }
+    } else {
+      return;
+    }
   }
 
-  core.startGroup("Setting forked comment");
-  await rest.createComment({
-    body: [
-      `⚠️ This PR is from a repository outside your account so it will not be deployed. If you are a collaborator on this project and you wish to allow **@${github.context.actor}** to deploy this commit, press the checkbox below.`,
-      "- [ ] Allow deployment",
-    ].join("\n"),
-  });
-  core.endGroup();
-
-  console.log(
-    await rest.octokit.rest.repos
-      .checkCollaborator({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        username: "hello",
-      })
-      .then(() => true)
-      .catch(() => false),
-  );
+  console.log("Hello, world!");
 
   // let commitMessage = "";
   // if (github.context.eventName === "push") {

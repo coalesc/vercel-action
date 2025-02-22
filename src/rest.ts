@@ -30,6 +30,17 @@ export class Rest {
       await this.createCommentOnCommit(context);
   }
 
+  async checkCollaborator() {
+    return this.octokit.rest.repos
+      .checkCollaborator({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        username: github.context.actor,
+      })
+      .then(() => true)
+      .catch(() => false);
+  }
+
   private async createCommentOnCommit(context: CommentContext) {
     const commentBody = this.buildCommentBody(context);
     const commentId = await this.findPreviousComment(this.buildCommentPrefix());
