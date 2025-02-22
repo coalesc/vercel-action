@@ -42,11 +42,14 @@ async function run() {
     commitMessage = data.message;
   }
 
+  core.startGroup("Setting pending comment");
+  await rest.createComment({ commitSha: sha });
+  core.endGroup();
+
   core.startGroup("Deploying to Vercel");
   const { deploymentUrl, inspectUrl } = await vercel.deploy(ref, commitMessage);
-  if (!deploymentUrl || !inspectUrl) {
+  if (!deploymentUrl || !inspectUrl)
     core.warning("Couldn't get deployment or inspect URL");
-  }
   core.endGroup();
 
   core.startGroup("Inspecting deployment");
@@ -55,24 +58,13 @@ async function run() {
   if (!deploymentName) core.warning("Couldn't get deployment name");
   core.endGroup();
 
-  core.startGroup("Adding or updating comment");
-  if (deploymentName) {
-    if (github.context.issue.number) {
-      await rest.createCommentOnPullRequest({
-        inspectUrl,
-        deploymentUrl,
-        commitSha: sha,
-        name: deploymentName,
-      });
-    } else if (github.context.eventName === "push") {
-      await rest.createCommentOnCommit({
-        inspectUrl,
-        deploymentUrl,
-        commitSha: sha,
-        name: deploymentName,
-      });
-    }
-  }
+  core.startGroup("Setting ready comment");
+  await rest.createComment({
+    inspectUrl,
+    deploymentUrl,
+    commitSha: sha,
+    name: deploymentName ?? undefined,
+  });
   core.endGroup();
 }
 

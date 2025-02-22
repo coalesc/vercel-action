@@ -7,10 +7,10 @@ interface Comment {
 }
 
 interface CommentContext {
-  name: string;
+  name?: string;
   commitSha: string;
-  inspectUrl: string;
-  deploymentUrl: string;
+  inspectUrl?: string;
+  deploymentUrl?: string;
 }
 
 export class Rest {
@@ -22,11 +22,16 @@ export class Rest {
     return event.startsWith("pull_request");
   }
 
-  async createCommentOnCommit(context: CommentContext) {
+  async createComment(context: CommentContext) {
+    if (github.context.issue.number)
+      await this.createCommentOnPullRequest(context);
+    else if (github.context.eventName === "push")
+      await this.createCommentOnCommit(context);
+  }
+
+  private async createCommentOnCommit(context: CommentContext) {
     const commentBody = this.buildCommentBody(context);
-    const commentId = await this.findPreviousComment(
-      this.buildCommentPrefix(context.name),
-    );
+    const commentId = await this.findPreviousComment(this.buildCommentPrefix());
 
     if (commentId) {
       await this.octokit.rest.repos.updateCommitComment({
@@ -43,11 +48,9 @@ export class Rest {
     }
   }
 
-  async createCommentOnPullRequest(context: CommentContext) {
+  private async createCommentOnPullRequest(context: CommentContext) {
     const commentBody = this.buildCommentBody(context);
-    const commentId = await this.findPreviousComment(
-      this.buildCommentPrefix(context.name),
-    );
+    const commentId = await this.findPreviousComment(this.buildCommentPrefix());
 
     if (commentId) {
       await this.octokit.rest.issues.updateComment({
@@ -64,13 +67,13 @@ export class Rest {
     }
   }
 
-  private buildCommentPrefix(name: string) {
+  private buildCommentPrefix() {
     return "<!-- VERCEL DEPLOYMENT COMMENT -->";
   }
 
   private buildCommentBody(context: CommentContext) {
     return [
-      this.buildCommentPrefix(context.name),
+      this.buildCommentPrefix(),
       "",
       "<table>",
       "<tr>",
@@ -79,19 +82,19 @@ export class Rest {
       "</tr>",
       "<tr>",
       "<td><strong>Name:</strong></td>",
-      `<td>${context.name}</td>`,
+      `<td>${context.name ?? "N/A"}</td>`,
       "</tr>",
       "<tr>",
       "<td><strong>⏰ Status:</strong></td>",
-      "<td>Ready</td>",
+      `<td>${!context.inspectUrl ? "Pending" : "Ready"}</td>`,
       "</tr>",
       "<tr>",
       "<td><strong>✅ Deployment:</strong></td>",
-      `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
+      `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.deploymentUrl}'>${context.deploymentUrl}</a>`}</td>`,
       "</tr>",
       "<tr>",
       "<td><strong>🔍 Inspect:</strong></td>",
-      `<td><a href='${context.inspectUrl}'>Visit Vercel dashboard</a></td>`,
+      `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.inspectUrl}'>Visit Vercel dashboard</a>`}</td>`,
       "</tr>",
       "<tr>",
       "<td><strong>📝 Workflow Logs:</strong></td>",
