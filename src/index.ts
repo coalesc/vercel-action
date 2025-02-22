@@ -8,6 +8,8 @@ const vercel = new Vercel();
 const rest = new Rest();
 
 async function run() {
+  let { ref, sha } = github.context;
+
   if (rest.isPullRequestType(github.context.eventName)) {
     const payload = github.context.payload as PullRequestEvent;
 
@@ -17,13 +19,6 @@ async function run() {
       return;
     }
   }
-
-  let { ref, sha } = github.context;
-  await vercel.setEnv();
-
-  core.startGroup("Disabling telemetry for Vercel CLI");
-  await vercel.disableTelemetry();
-  core.endGroup();
 
   let commitMessage = "";
   if (github.context.eventName === "push") {
@@ -44,6 +39,11 @@ async function run() {
 
   core.startGroup("Setting pending comment");
   await rest.createComment({ commitSha: sha });
+  core.endGroup();
+
+  await vercel.setEnv();
+  core.startGroup("Disabling telemetry for Vercel CLI");
+  await vercel.disableTelemetry();
   core.endGroup();
 
   core.startGroup("Deploying to Vercel");

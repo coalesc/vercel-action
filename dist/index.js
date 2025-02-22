@@ -31694,9 +31694,15 @@ class Rest {
     isPullRequestType(event) {
         return event.startsWith("pull_request");
     }
+    async createComment(context) {
+        if (github.context.issue.number)
+            await this.createCommentOnPullRequest(context);
+        else if (github.context.eventName === "push")
+            await this.createCommentOnCommit(context);
+    }
     async createCommentOnCommit(context) {
         const commentBody = this.buildCommentBody(context);
-        const commentId = await this.findPreviousComment(this.buildCommentPrefix(context.name));
+        const commentId = await this.findPreviousComment(this.buildCommentPrefix());
         if (commentId) {
             await this.octokit.rest.repos.updateCommitComment({
                 ...github.context.repo,
@@ -31714,7 +31720,7 @@ class Rest {
     }
     async createCommentOnPullRequest(context) {
         const commentBody = this.buildCommentBody(context);
-        const commentId = await this.findPreviousComment(this.buildCommentPrefix(context.name));
+        const commentId = await this.findPreviousComment(this.buildCommentPrefix());
         if (commentId) {
             await this.octokit.rest.issues.updateComment({
                 ...github.context.repo,
@@ -31730,12 +31736,12 @@ class Rest {
             });
         }
     }
-    buildCommentPrefix(name) {
+    buildCommentPrefix() {
         return "<!-- VERCEL DEPLOYMENT COMMENT -->";
     }
     buildCommentBody(context) {
         return [
-            this.buildCommentPrefix(context.name),
+            this.buildCommentPrefix(),
             "",
             "<table>",
             "<tr>",
@@ -31744,19 +31750,19 @@ class Rest {
             "</tr>",
             "<tr>",
             "<td><strong>Name:</strong></td>",
-            `<td>${context.name}</td>`,
+            `<td>${context.name ?? "N/A"}</td>`,
             "</tr>",
             "<tr>",
             "<td><strong>⏰ Status:</strong></td>",
-            "<td>Ready</td>",
+            `<td>${!context.inspectUrl ? "Pending" : "Ready"}</td>`,
             "</tr>",
             "<tr>",
             "<td><strong>✅ Deployment:</strong></td>",
-            `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
+            `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.deploymentUrl}'>${context.deploymentUrl}</a>`}</td>`,
             "</tr>",
             "<tr>",
             "<td><strong>🔍 Inspect:</strong></td>",
-            `<td><a href='${context.inspectUrl}'>Visit Vercel dashboard</a></td>`,
+            `<td>${!context.inspectUrl ? "N/A" : `<a href='${context.inspectUrl}'>Visit Vercel dashboard</a>`}</td>`,
             "</tr>",
             "<tr>",
             "<td><strong>📝 Workflow Logs:</strong></td>",
@@ -31880,6 +31886,7 @@ class Vercel {
 const vercel = new Vercel();
 const rest = new Rest();
 async function run() {
+    let { ref, sha } = github.context;
     if (rest.isPullRequestType(github.context.eventName)) {
         const payload = github.context.payload;
         const baseRepo = payload.pull_request.base.repo;
@@ -31888,11 +31895,6 @@ async function run() {
             return;
         }
     }
-    let { ref, sha } = github.context;
-    await vercel.setEnv();
-    core.startGroup("Disabling telemetry for Vercel CLI");
-    await vercel.disableTelemetry();
-    core.endGroup();
     let commitMessage = "";
     if (github.context.eventName === "push") {
         const pushPayload = github.context.payload;
@@ -31908,36 +31910,30 @@ async function run() {
         });
         commitMessage = data.message;
     }
+    core.startGroup("Setting pending comment");
+    await rest.createComment({ commitSha: sha });
+    core.endGroup();
+    await vercel.setEnv();
+    core.startGroup("Disabling telemetry for Vercel CLI");
+    await vercel.disableTelemetry();
+    core.endGroup();
     core.startGroup("Deploying to Vercel");
     const { deploymentUrl, inspectUrl } = await vercel.deploy(ref, commitMessage);
-    if (!deploymentUrl || !inspectUrl) {
+    if (!deploymentUrl || !inspectUrl)
         core.warning("Couldn't get deployment or inspect URL");
-    }
     core.endGroup();
     core.startGroup("Inspecting deployment");
     const deploymentName = vercel.projectName || (await vercel.inspect(deploymentUrl));
     if (!deploymentName)
         core.warning("Couldn't get deployment name");
     core.endGroup();
-    core.startGroup("Adding or updating comment");
-    if (deploymentName) {
-        if (github.context.issue.number) {
-            await rest.createCommentOnPullRequest({
-                inspectUrl,
-                deploymentUrl,
-                commitSha: sha,
-                name: deploymentName,
-            });
-        }
-        else if (github.context.eventName === "push") {
-            await rest.createCommentOnCommit({
-                inspectUrl,
-                deploymentUrl,
-                commitSha: sha,
-                name: deploymentName,
-            });
-        }
-    }
+    core.startGroup("Setting ready comment");
+    await rest.createComment({
+        inspectUrl,
+        deploymentUrl,
+        commitSha: sha,
+        name: deploymentName ?? undefined,
+    });
     core.endGroup();
 }
 (async () => {
