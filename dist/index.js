@@ -31739,24 +31739,24 @@ class Rest {
             "",
             "<table>",
             "<tr>",
-            "<td><strong>Name:</strong></td>",
-            `<td>${context.name}</td>`,
-            "</tr>",
-            "<tr>",
             "<td><strong>Latest commit:</strong></td>",
             `<td>${context.commitSha}</td>`,
+            "</tr>",
+            "<tr>",
+            "<td><strong>Name:</strong></td>",
+            `<td>${context.name}</td>`,
             "</tr>",
             "<tr>",
             "<td><strong>⏰ Status:</strong></td>",
             "<td>Ready</td>",
             "</tr>",
             "<tr>",
-            "<td><strong>🔍 Inspect:</strong></td>",
-            `<td><a href='${context.inspectUrl}'>${context.inspectUrl}</a></td>`,
-            "</tr>",
-            "<tr>",
             "<td><strong>✅ Deployment:</strong></td>",
             `<td><a href='${context.deploymentUrl}'>${context.deploymentUrl}</a></td>`,
+            "</tr>",
+            "<tr>",
+            "<td><strong>🔍 Inspect:</strong></td>",
+            `<td><a href='${context.inspectUrl}'>Visit Vercel dashboard</a></td>`,
             "</tr>",
             "<tr>",
             "<td><strong>📝 Workflow Logs:</strong></td>",
@@ -31823,7 +31823,6 @@ class Vercel {
             core.exportVariable("VERCEL_PROJECT_ID", this.projectId);
     }
     async disableTelemetry() {
-        core.info("Disabling telemetry for Vercel CLI");
         await exec.exec("npx", [this.bin, "telemetry", "disable"]);
     }
     async deploy(ref, commit) {
@@ -31841,7 +31840,7 @@ class Vercel {
                 },
                 stderr: (data) => {
                     if (data.toString().startsWith("Inspect: https://vercel.com"))
-                        inspectUrl = data.toString().replace("Inspect: ", "");
+                        inspectUrl = data.toString().split(" ")[1];
                 },
             },
         });
@@ -31863,15 +31862,6 @@ class Vercel {
         });
         const match = error.match(/^\s+name\s+(.+)$/m);
         return match?.length ? match[1] : null;
-    }
-    addMetadata(key, value, providedArgs) {
-        const metadataRegex = new RegExp(`^${key}=.+`, "g");
-        for (const arg of providedArgs) {
-            if (arg.match(metadataRegex)) {
-                return [];
-            }
-        }
-        return ["-m", `${key}=${value}`];
     }
     parseArgs(s) {
         const args = [];
@@ -31900,7 +31890,9 @@ async function run() {
     }
     let { ref, sha } = github.context;
     await vercel.setEnv();
+    core.startGroup("Disabling telemetry for Vercel CLI");
     await vercel.disableTelemetry();
+    core.endGroup();
     let commitMessage = "";
     if (github.context.eventName === "push") {
         const pushPayload = github.context.payload;

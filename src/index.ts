@@ -20,7 +20,10 @@ async function run() {
 
   let { ref, sha } = github.context;
   await vercel.setEnv();
+
+  core.startGroup("Disabling telemetry for Vercel CLI");
   await vercel.disableTelemetry();
+  core.endGroup();
 
   let commitMessage = "";
   if (github.context.eventName === "push") {

@@ -25,7 +25,6 @@ export class Vercel {
   }
 
   async disableTelemetry() {
-    core.info("Disabling telemetry for Vercel CLI");
     await exec.exec("npx", [this.bin, "telemetry", "disable"]);
   }
 
@@ -45,7 +44,7 @@ export class Vercel {
         },
         stderr: (data) => {
           if (data.toString().startsWith("Inspect: https://vercel.com"))
-            inspectUrl = data.toString().replace("Inspect: ", "");
+            inspectUrl = data.toString().split(" ")[1];
         },
       },
     });
@@ -71,21 +70,6 @@ export class Vercel {
 
     const match = error.match(/^\s+name\s+(.+)$/m);
     return match?.length ? match[1] : null;
-  }
-
-  private addMetadata(
-    key: string,
-    value: string | number,
-    providedArgs: string[],
-  ) {
-    const metadataRegex = new RegExp(`^${key}=.+`, "g");
-    for (const arg of providedArgs) {
-      if (arg.match(metadataRegex)) {
-        return [];
-      }
-    }
-
-    return ["-m", `${key}=${value}`];
   }
 
   private parseArgs(s: string) {
